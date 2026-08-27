@@ -72,6 +72,27 @@ final class GameBusiness
     {
         return GameFormat::snapshot($this->repository->hydrated($this->required($context, $id)));
     }
+
+    /** @return array<string, mixed> */
+    public function nextRandom(PlayerContext $context, string $id): array
+    {
+        $game = $this->required($context, $id);
+        if ($game->room_id !== null || !in_array((string) $game->getAttribute('status'), ['solved', 'finished', 'abandoned'], true)) {
+            ErrorCode::GAME_STATUS_INVALID->throw();
+        }
+        $question = Question::query()
+            ->where('status', 'published')
+            ->where('risk_level', 'safe')
+            ->where('id', '!=', (int) $game->getAttribute('question_id'))
+            ->inRandomOrder()
+            ->first();
+        if (!$question instanceof Question) {
+            ErrorCode::QUESTION_NOT_FOUND->throw();
+        }
+
+        return $this->create($context, (string) $question->public_id, (string) $game->getAttribute('content_locale'), false);
+    }
+
     public function history(PlayerContext $context): array
     {
         $query = Game::query();

@@ -11,6 +11,21 @@ use Workerman\Connection\TcpConnection;
 
 final class GameWebSocketTest extends TestCase
 {
+    public function testContinueUsesAWebSocketNavigationEventForSingleAndMultiplayerGames(): void
+    {
+        $gameBusiness = file_get_contents(dirname(__DIR__, 2).'/app/Game/Business/GameBusiness.php');
+        $webSocket = file_get_contents(dirname(__DIR__, 2).'/app/Game/WebSocket/GameWebSocket.php');
+
+        self::assertIsString($gameBusiness);
+        self::assertIsString($webSocket);
+        self::assertStringContainsString('public function nextRandom(PlayerContext $context, string $id): array', $gameBusiness);
+        self::assertStringContainsString("if (\$event === 'v1.game.next')", $webSocket);
+        self::assertStringContainsString("'v1.game.next.started'", $webSocket);
+        self::assertStringContainsString("'question_id' => (string) (\$result['question_id'] ?? '')", $webSocket);
+        self::assertStringContainsString("'game_id' => (string) (\$result['id'] ?? '')", $webSocket);
+        self::assertStringContainsString('$this->broadcastRoomSnapshots($roomId, $requestId);', $webSocket);
+    }
+
     public function testRegisteredHistoryKeepsOwnerFallbackAndRoomCreationBackfillsOwnerPlayer(): void
     {
         $gameBusiness = file_get_contents(dirname(__DIR__, 2).'/app/Game/Business/GameBusiness.php');

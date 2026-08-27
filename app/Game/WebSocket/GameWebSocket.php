@@ -121,6 +121,29 @@ final class GameWebSocket
     {
         $business = new GameBusiness();
         $gameId = (string) ($payload['game_id'] ?? '');
+        if ($event === 'v1.game.next') {
+            $current = $business->snapshot($context, $gameId);
+            $roomId = (string) ($current['room_id'] ?? '');
+            if ($roomId !== '') {
+                $result = (new RoomBusiness())->nextRandom($context, $roomId);
+                $next = [
+                    'room_id' => $roomId,
+                    'question_id' => (string) ($result['question_id'] ?? ''),
+                    'game_id' => (string) ($result['game_id'] ?? ''),
+                ];
+                $this->broadcast($roomId, 'v1.game.next.started', $requestId, $next);
+                $this->broadcastRoomSnapshots($roomId, $requestId);
+            } else {
+                $result = $business->nextRandom($context, $gameId);
+                $this->send($connection, 'v1.game.next.started', $requestId, [
+                    'room_id' => '',
+                    'question_id' => (string) ($result['question_id'] ?? ''),
+                    'game_id' => (string) ($result['id'] ?? ''),
+                ]);
+            }
+
+            return;
+        }
         $result = match ($event) {
             'v1.game.join' => $business->snapshot($context, $gameId),
             'v1.game.question' => $business->ask($context, $gameId, $requestId, (string) ($payload['question'] ?? '')),
