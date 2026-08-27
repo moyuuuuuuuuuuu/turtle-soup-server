@@ -2,7 +2,9 @@ FROM composer:2.8 AS vendor
 
 WORKDIR /app
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-interaction --no-progress --prefer-dist --no-scripts
+RUN composer install --no-dev --no-interaction --no-progress --prefer-dist --no-scripts \
+    --ignore-platform-req=ext-gd \
+    --ignore-platform-req=ext-redis
 
 COPY . .
 RUN composer dump-autoload --no-dev --classmap-authoritative --no-interaction
@@ -20,6 +22,7 @@ RUN apt-get update \
     && docker-php-ext-install -j"$(nproc)" bcmath gd pcntl pdo_mysql zip \
     && pecl install redis-6.3.0 \
     && docker-php-ext-enable redis \
+    && php -r 'foreach (["gd", "redis"] as $extension) { if (!extension_loaded($extension)) { fwrite(STDERR, "Missing PHP extension: {$extension}\n"); exit(1); } }' \
     && rm -rf /var/lib/apt/lists/* /tmp/pear
 
 WORKDIR /app
