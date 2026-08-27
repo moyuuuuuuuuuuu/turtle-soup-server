@@ -21,6 +21,6 @@ final class PublicQuestionController extends BaseController
     }
     public function random(Request $request): Response
     {
-        return $this->success((new PublicQuestionBusiness())->random($request->only(['difficulty', 'tag_id', 'language'])), (string) $request->header('X-Request-Id', ''));
+        return $this->success((new PublicQuestionBusiness())->random($request->only(['difficulty', 'tag_id', 'language', 'risk_level'])), (string) $request->header('X-Request-Id', ''));
     }
 }

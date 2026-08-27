@@ -216,6 +216,17 @@ final class GameWebSocket
 
             return;
         }
+        if ($event === 'v1.room.next') {
+            $result = $business->nextRandom($context, $roomId);
+            $this->broadcast($roomId, 'v1.room.next.started', $requestId, [
+                'room_id' => $roomId,
+                'question_id' => (string) ($result['question_id'] ?? ''),
+                'game_id' => (string) ($result['game_id'] ?? ''),
+            ]);
+            $this->broadcastRoomSnapshots($roomId, $requestId);
+
+            return;
+        }
         match ($event) {
             'v1.room.chat' => $business->chat($context, $roomId, $requestId, (string) ($payload['content'] ?? '')),
             'v1.room.ready' => $business->ready($context, $roomId, (bool) ($payload['ready'] ?? true)),

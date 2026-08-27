@@ -57,12 +57,20 @@ final class RoomController extends BaseController
 
     public function next(Request $request): Response
     {
-        return $this->success((new RoomBusiness())->next(
-            $this->context($request),
-            (string) $request->post('id'),
-            (string) $request->post('question_id'),
-            filter_var($request->post('risk_confirmed', false), FILTER_VALIDATE_BOOL),
-        ), $this->requestId($request));
+        $business = new RoomBusiness();
+        $context = $this->context($request);
+        $id = (string) $request->post('id');
+        $questionId = trim((string) $request->post('question_id', ''));
+        $result = $questionId === ''
+            ? $business->nextRandom($context, $id)
+            : $business->next(
+                $context,
+                $id,
+                $questionId,
+                filter_var($request->post('risk_confirmed', false), FILTER_VALIDATE_BOOL),
+            );
+
+        return $this->success($result, $this->requestId($request));
     }
 
     public function leave(Request $request): Response

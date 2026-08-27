@@ -256,6 +256,28 @@ final class RoomBusiness
         });
     }
 
+    /** @return array<string, mixed> */
+    public function nextRandom(PlayerContext $context, string $id): array
+    {
+        $userId = $this->userId($context);
+        $room = $this->required($id);
+        $this->assertOwner($room, $userId);
+        if ($room->status !== 'finished') {
+            ErrorCode::ROOM_STATUS_INVALID->throw();
+        }
+        $question = Question::query()
+            ->where('status', 'published')
+            ->where('risk_level', 'safe')
+            ->where('id', '!=', (int) $room->question_id)
+            ->inRandomOrder()
+            ->first();
+        if (!$question instanceof Question) {
+            ErrorCode::QUESTION_NOT_FOUND->throw();
+        }
+
+        return $this->next($context, $id, (string) $question->public_id, false);
+    }
+
     public function leave(PlayerContext $context, string $id): void
     {
         $userId = $this->userId($context);

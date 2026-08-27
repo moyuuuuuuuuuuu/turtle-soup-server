@@ -52,6 +52,9 @@ final class PublicQuestionBusiness
         if (($filters['tag_id'] ?? '') !== '') {
             $query->whereHas('tags', fn ($item) => $item->where('turtle_tags.id', (int) $filters['tag_id']));
         }
+        if (in_array($filters['risk_level'] ?? null, ['safe', 'caution'], true)) {
+            $query->where('risk_level', (string) $filters['risk_level']);
+        }
         if (($filters['keyword'] ?? '') !== '') {
             $keyword = '%' . $filters['keyword'] . '%';
             $query->whereHas('translations', fn ($item) => $item->where('language', (string) ($filters['language'] ?? 'zh-CN'))->where(fn ($text) => $text->whereLike('title', $keyword)->orWhereLike('surface', $keyword)));

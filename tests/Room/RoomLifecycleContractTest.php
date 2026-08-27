@@ -88,4 +88,22 @@ final class RoomLifecycleContractTest extends TestCase
         self::assertStringContainsString("'username' => \$user instanceof User ? \$user->username : '玩家'", $webSocket);
         self::assertStringContainsString("'reason' => \$reason", $webSocket);
     }
+
+    public function testOwnerCanContinueWithARandomSafeQuestionWithoutLeavingTheRoom(): void
+    {
+        $business = file_get_contents(dirname(__DIR__, 2) . '/app/Room/Business/RoomBusiness.php');
+        $webSocket = file_get_contents(dirname(__DIR__, 2) . '/app/Game/WebSocket/GameWebSocket.php');
+
+        self::assertIsString($business);
+        self::assertIsString($webSocket);
+        self::assertStringContainsString('public function nextRandom(PlayerContext $context, string $id): array', $business);
+        self::assertStringContainsString("->where('risk_level', 'safe')", $business);
+        self::assertStringContainsString("->where('id', '!=', (int) \$room->question_id)", $business);
+        self::assertStringContainsString("if (\$event === 'v1.room.next')", $webSocket);
+        self::assertStringContainsString('$business->nextRandom($context, $roomId);', $webSocket);
+        self::assertStringContainsString("'v1.room.next.started'", $webSocket);
+        self::assertStringContainsString("'question_id' => (string) (\$result['question_id'] ?? '')", $webSocket);
+        self::assertStringContainsString("'game_id' => (string) (\$result['game_id'] ?? '')", $webSocket);
+        self::assertStringContainsString('$this->broadcastRoomSnapshots($roomId, $requestId);', $webSocket);
+    }
 }
