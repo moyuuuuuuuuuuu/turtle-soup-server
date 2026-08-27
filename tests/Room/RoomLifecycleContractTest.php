@@ -106,4 +106,15 @@ final class RoomLifecycleContractTest extends TestCase
         self::assertStringContainsString("'game_id' => (string) (\$result['game_id'] ?? '')", $webSocket);
         self::assertStringContainsString('$this->broadcastRoomSnapshots($roomId, $requestId);', $webSocket);
     }
+
+    public function testHttpRoomContinuationCanBeBroadcastToTheOriginalTeam(): void
+    {
+        $webSocket = file_get_contents(dirname(__DIR__, 2) . '/app/Game/WebSocket/GameWebSocket.php');
+
+        self::assertIsString($webSocket);
+        self::assertStringContainsString("if (\$event === 'v1.room.next.sync')", $webSocket);
+        self::assertStringContainsString('ErrorCode::ROOM_OWNER_REQUIRED->throw();', $webSocket);
+        self::assertStringContainsString("\$this->broadcast(\$roomId, 'v1.room.next.started'", $webSocket);
+        self::assertStringContainsString('$this->broadcastRoomSnapshots($roomId, $requestId);', $webSocket);
+    }
 }

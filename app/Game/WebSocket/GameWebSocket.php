@@ -7,6 +7,7 @@ namespace App\Game\WebSocket;
 use App\Auth\Entities\PlayerContext;
 use App\Auth\Models\User;
 use App\Auth\Services\PlayerPrincipalService;
+use App\Common\Enums\ErrorCode;
 use App\Game\Business\GameBusiness;
 use App\Room\Business\RoomBusiness;
 use Throwable;
@@ -235,6 +236,23 @@ final class GameWebSocket
         }
         if ($event === 'v1.room.visibility.update') {
             $business->updateVisibility($context, $roomId, (string) ($payload['visibility'] ?? ''));
+            $this->broadcastRoomSnapshots($roomId, $requestId);
+
+            return;
+        }
+        if ($event === 'v1.room.next.sync') {
+            $result = $business->snapshot($context, $roomId);
+            if (($result['is_owner'] ?? false) !== true) {
+                ErrorCode::ROOM_OWNER_REQUIRED->throw();
+            }
+            if (($result['status'] ?? '') !== 'playing' || empty($result['game_id'])) {
+                ErrorCode::ROOM_STATUS_INVALID->throw();
+            }
+            $this->broadcast($roomId, 'v1.room.next.started', $requestId, [
+                'room_id' => $roomId,
+                'question_id' => (string) ($result['question_id'] ?? ''),
+                'game_id' => (string) ($result['game_id'] ?? ''),
+            ]);
             $this->broadcastRoomSnapshots($roomId, $requestId);
 
             return;
