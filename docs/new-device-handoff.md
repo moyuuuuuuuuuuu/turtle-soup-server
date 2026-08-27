@@ -73,15 +73,13 @@ pnpm install --frozen-lockfile
 pnpm lint && pnpm build
 ```
 
-本项目使用同一个 GitHub 仓库的三个长期分支：
+本项目按部署边界拆分为三个 GitHub 仓库，默认分支均为 `main`：
 
-| 分支 | 内容 | 当前远端基线 |
+| 仓库 | 内容 | 地址 |
 | --- | --- | --- |
-| `system-manage` | Webman/PHP 后端、公开 API、WebSocket、数据库迁移 | `81a64c1` |
-| `ui` | uni-app + Vue 3 + TypeScript + Wot UI 用户端 | `a0e3627` |
-| `system-manage-ui` | SaiAdmin 管理端 Vue 前端 | `566cab2` |
-
-仓库地址：`git@github.com:moyuuuuuuuuuuu/turtle-soup.git`
+| `turtle-soup-server` | Webman/PHP 后端、公开 API、WebSocket、数据库迁移 | `git@github.com:moyuuuuuuuuuuu/turtle-soup-server.git` |
+| `turtle-soup` | uni-app + Vue 3 + TypeScript + Wot UI 用户端 | `git@github.com:moyuuuuuuuuuuu/turtle-soup.git` |
+| `turtle-soup-admin` | SaiAdmin 管理端 Vue 前端 | `git@github.com:moyuuuuuuuuuuu/turtle-soup-admin.git` |
 
 > 上述三个提交已经推送到远端，包含多人房间、捐赠和新版 UI。新设备 clone 后仍需
 > 按本文配置本地 `.env` 和数据库；这些敏感或设备相关数据不会进入 Git。
@@ -130,18 +128,17 @@ pnpm lint && pnpm build
 ssh -T git@github.com
 ```
 
-## 3. 克隆三个分支
+## 3. 克隆三个仓库
 
-推荐让后端直接位于 DNMP 的 `www/hgt`，其他两个分支使用 Git worktree：
+推荐让后端直接位于 DNMP 的 `www/hgt`，两个前端使用独立克隆：
 
 ```bash
 cd /你的路径/dnmp/www
-git clone --branch system-manage git@github.com:moyuuuuuuuuuuu/turtle-soup.git hgt
-cd hgt
+git clone git@github.com:moyuuuuuuuuuuu/turtle-soup-server.git hgt
 
 mkdir -p /你的路径/hgt-worktrees
-git worktree add /你的路径/hgt-worktrees/ui ui
-git worktree add /你的路径/hgt-worktrees/system-manage-ui system-manage-ui
+git clone git@github.com:moyuuuuuuuuuuu/turtle-soup.git /你的路径/hgt-worktrees/ui
+git clone git@github.com:moyuuuuuuuuuuu/turtle-soup-admin.git /你的路径/hgt-worktrees/system-manage-ui
 ```
 
 如果希望保留旧设备的路径习惯，可增加符号链接：
@@ -150,7 +147,7 @@ git worktree add /你的路径/hgt-worktrees/system-manage-ui system-manage-ui
 ln -s /你的路径/dnmp/www/hgt /你的路径/hgt
 ```
 
-确认分支：
+确认三个仓库均使用 `main`：
 
 ```bash
 git -C /你的路径/dnmp/www/hgt branch --show-current
@@ -158,7 +155,7 @@ git -C /你的路径/hgt-worktrees/ui branch --show-current
 git -C /你的路径/hgt-worktrees/system-manage-ui branch --show-current
 ```
 
-依次应输出 `system-manage`、`ui`、`system-manage-ui`。
+三个命令均应输出 `main`。
 
 ## 4. 后端环境文件
 
@@ -406,11 +403,12 @@ git -C /你的路径/dnmp/www/hgt status -sb
 git -C /你的路径/hgt-worktrees/ui status -sb
 git -C /你的路径/hgt-worktrees/system-manage-ui status -sb
 
-git ls-remote --heads git@github.com:moyuuuuuuuuuuu/turtle-soup.git \
-  system-manage ui system-manage-ui
+git ls-remote --heads git@github.com:moyuuuuuuuuuuu/turtle-soup-server.git main
+git ls-remote --heads git@github.com:moyuuuuuuuuuuu/turtle-soup.git main
+git ls-remote --heads git@github.com:moyuuuuuuuuuuu/turtle-soup-admin.git main
 ```
 
-三个 `status -sb` 应没有未提交文件，`ls-remote` 返回的提交应等于旧设备本地各分支的
+三个 `status -sb` 应没有未提交文件，三个 `ls-remote` 返回的提交应等于旧设备本地各仓库的
 `git rev-parse HEAD`。如果不相等，不要在新设备继续开发，否则会遗漏旧设备的实现。
 
 ## 12. 安全与数据库约束
