@@ -36,8 +36,8 @@ if ($errorReporting = $appConfig['error_reporting'] ?? '') {
 if (!in_array($argv[1] ?? '', ['start', 'restart', 'stop', 'status', 'reload', 'connections'])) {
     require_once __DIR__ . '/support/bootstrap.php';
 } else {
-    if (class_exists('Support\App')) {
-        Support\App::loadAllConfig(['route']);
+    if (class_exists('support\App')) {
+        support\App::loadAllConfig(['route']);
     } else {
         Config::reload(config_path(), ['route', 'container']);
     }
