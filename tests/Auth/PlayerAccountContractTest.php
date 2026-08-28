@@ -22,7 +22,23 @@ final class PlayerAccountContractTest extends TestCase
     {
         self::assertSame('player@example.com', EmailCodeService::normalizeEmail(' Player@Example.COM '));
         self::assertSame('wechat_mini_program', IdentityProvider::WECHAT_MINI_PROGRAM->value);
+        self::assertSame('douyin_mini_program', IdentityProvider::DOUYIN_MINI_PROGRAM->value);
         self::assertSame('wechat_official_account', IdentityProvider::WECHAT_OFFICIAL_ACCOUNT->value);
+    }
+
+    public function testMiniProgramLoginKeepsProviderSecretsOnTheServer(): void
+    {
+        $routes = file_get_contents(dirname(__DIR__, 2).'/config/route.php');
+        $service = file_get_contents(dirname(__DIR__, 2).'/app/Auth/Services/MiniProgramLoginService.php');
+        $config = file_get_contents(dirname(__DIR__, 2).'/config/mini_program.php');
+        self::assertIsString($routes);
+        self::assertIsString($service);
+        self::assertIsString($config);
+        self::assertStringContainsString("'/api/v1/auth/login/mini-program'", $routes);
+        self::assertStringContainsString('https://api.weixin.qq.com/sns/jscode2session', $service);
+        self::assertStringContainsString('https://developer.toutiao.com/api/apps/v2/jscode2session', $service);
+        self::assertStringContainsString("env('WECHAT_MINI_PROGRAM_APP_SECRET'", $config);
+        self::assertStringContainsString("env('DOUYIN_MINI_PROGRAM_APP_SECRET'", $config);
     }
 
     public function testPlayerAuthenticationErrorsRemainStable(): void

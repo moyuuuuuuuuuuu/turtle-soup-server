@@ -6,6 +6,10 @@ namespace App\Auth\Models;
 
 use App\Common\Models\PersistenceModel;
 
+/**
+ * @property int $id
+ * @property int $user_id
+ */
 final class UserIdentity extends PersistenceModel
 {
     protected $table = 'turtle_user_identities';

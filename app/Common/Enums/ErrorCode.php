@@ -38,6 +38,9 @@ enum ErrorCode: string implements ErrorCodeInterface
     case AUTH_DEVICE_LIMIT_REACHED = 'auth.device_limit_reached';
     case AUTH_USER_DISABLED = 'auth.user_disabled';
     case AUTH_ANONYMOUS_MERGE_FAILED = 'auth.anonymous_merge_failed';
+    case AUTH_MINI_PROGRAM_PLATFORM_INVALID = 'auth.mini_program_platform_invalid';
+    case AUTH_MINI_PROGRAM_NOT_CONFIGURED = 'auth.mini_program_not_configured';
+    case AUTH_MINI_PROGRAM_LOGIN_FAILED = 'auth.mini_program_login_failed';
     case GAME_NOT_FOUND = 'game.not_found';
     case GAME_STATUS_INVALID = 'game.status_invalid';
     case GAME_QUESTION_LIMIT_REACHED = 'game.question_limit_reached';
@@ -107,6 +110,9 @@ enum ErrorCode: string implements ErrorCodeInterface
             self::AUTH_DEVICE_LIMIT_REACHED => '最多允许三台设备同时登录',
             self::AUTH_USER_DISABLED => '账号已被禁用',
             self::AUTH_ANONYMOUS_MERGE_FAILED => '匿名游戏记录合并失败',
+            self::AUTH_MINI_PROGRAM_PLATFORM_INVALID => '不支持的小程序平台',
+            self::AUTH_MINI_PROGRAM_NOT_CONFIGURED => '小程序登录尚未配置',
+            self::AUTH_MINI_PROGRAM_LOGIN_FAILED => '小程序授权登录失败，请重试',
             self::GAME_NOT_FOUND => '游戏不存在',
             self::GAME_STATUS_INVALID => '当前游戏状态不允许此操作',
             self::GAME_QUESTION_LIMIT_REACHED => '提问次数已用完，请提交最终猜测',
@@ -163,6 +169,9 @@ enum ErrorCode: string implements ErrorCodeInterface
             self::AUTH_EMAIL_NOT_VERIFIED,
             self::AUTH_EMAIL_CODE_INVALID,
             self::AUTH_EMAIL_CODE_EXPIRED => 422,
+            self::AUTH_MINI_PROGRAM_PLATFORM_INVALID => 422,
+            self::AUTH_MINI_PROGRAM_LOGIN_FAILED => 401,
+            self::AUTH_MINI_PROGRAM_NOT_CONFIGURED => 503,
             self::AUTH_USERNAME_EXISTS,
             self::AUTH_EMAIL_EXISTS,
             self::AUTH_USERNAME_CHANGE_LIMITED,
@@ -240,6 +249,9 @@ enum ErrorCode: string implements ErrorCodeInterface
             self::AUTH_DEVICE_LIMIT_REACHED,
             self::AUTH_USER_DISABLED,
             self::AUTH_ANONYMOUS_MERGE_FAILED => ErrorModule::AUTH,
+            self::AUTH_MINI_PROGRAM_PLATFORM_INVALID,
+            self::AUTH_MINI_PROGRAM_NOT_CONFIGURED,
+            self::AUTH_MINI_PROGRAM_LOGIN_FAILED => ErrorModule::AUTH,
             self::GAME_NOT_FOUND,
             self::GAME_STATUS_INVALID,
             self::GAME_QUESTION_LIMIT_REACHED,
@@ -289,6 +301,8 @@ enum ErrorCode: string implements ErrorCodeInterface
             self::AUTH_DEVICE_LIMIT_REACHED,
             self::AUTH_USER_DISABLED,
             self::AUTH_ANONYMOUS_MERGE_FAILED,
+            self::AUTH_MINI_PROGRAM_PLATFORM_INVALID,
+            self::AUTH_MINI_PROGRAM_LOGIN_FAILED,
             self::GAME_NOT_FOUND,
             self::GAME_STATUS_INVALID,
             self::GAME_QUESTION_LIMIT_REACHED,
@@ -319,6 +333,7 @@ enum ErrorCode: string implements ErrorCodeInterface
             self::TAG_SLUG_INVALID => ErrorSeverity::INFO,
             self::SYSTEM_BUSY,
             self::SYSTEM_MAINTENANCE,
+            self::AUTH_MINI_PROGRAM_NOT_CONFIGURED,
             self::THIRD_PARTY_ERROR => ErrorSeverity::WARNING,
             self::STORAGE_UPLOAD_FAILED => ErrorSeverity::ERROR,
             self::AI_WORKFLOW_TIMEOUT => ErrorSeverity::WARNING,

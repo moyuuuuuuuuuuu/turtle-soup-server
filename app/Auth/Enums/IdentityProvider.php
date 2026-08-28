@@ -7,5 +7,6 @@ namespace App\Auth\Enums;
 enum IdentityProvider: string
 {
     case WECHAT_MINI_PROGRAM = 'wechat_mini_program';
+    case DOUYIN_MINI_PROGRAM = 'douyin_mini_program';
     case WECHAT_OFFICIAL_ACCOUNT = 'wechat_official_account';
 }

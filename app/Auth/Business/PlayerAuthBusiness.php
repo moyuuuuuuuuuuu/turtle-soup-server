@@ -9,10 +9,12 @@ use App\Auth\Formats\PlayerFormat;
 use App\Auth\Models\AnonymousSession;
 use App\Auth\Models\RefreshSession;
 use App\Auth\Models\User;
+use App\Auth\Models\UserIdentity;
 use App\Auth\Models\UserLoginLog;
 use App\Auth\Repositories\PlayerRepository;
 use App\Auth\Services\BosAvatarService;
 use App\Auth\Services\EmailCodeService;
+use App\Auth\Services\MiniProgramLoginService;
 use App\Auth\Services\PlayerTokenService;
 use App\Common\Enums\ErrorCode;
 use App\Common\Exceptions\BaseException;
@@ -23,8 +25,62 @@ use Webman\Http\UploadFile;
 
 final class PlayerAuthBusiness
 {
-    public function __construct(private readonly PlayerRepository $repository = new PlayerRepository(), private readonly PlayerTokenService $tokens = new PlayerTokenService(), private readonly EmailCodeService $codes = new EmailCodeService(), private readonly BosAvatarService $avatars = new BosAvatarService())
+    public function __construct(private readonly PlayerRepository $repository = new PlayerRepository(), private readonly PlayerTokenService $tokens = new PlayerTokenService(), private readonly EmailCodeService $codes = new EmailCodeService(), private readonly BosAvatarService $avatars = new BosAvatarService(), private readonly MiniProgramLoginService $miniPrograms = new MiniProgramLoginService())
     {
+    }
+
+    /**
+     * @param array<string,mixed> $data
+     * @param array{string,string,string,string} $device
+     * @return array<string,mixed>
+     */
+    public function miniProgramLogin(array $data, string $anonymousToken, array $device): array
+    {
+        $identity = $this->miniPrograms->exchange(
+            trim((string) ($data['platform'] ?? '')),
+            (string) ($data['code'] ?? ''),
+            (string) ($data['anonymous_code'] ?? '')
+        );
+        $provider = $identity['provider']->value;
+        $subject = $identity['subject'];
+        $user = $this->repository->byIdentity($provider, $subject);
+        if (!$user instanceof User) {
+            $user = Db::transaction(function () use ($identity, $provider, $subject): User {
+                $existing = $this->repository->byIdentity($provider, $subject);
+                if ($existing instanceof User) {
+                    return $existing;
+                }
+                $publicId = PublicId::make();
+                $username = $this->availablePlatformUsername($identity['provider']->name);
+                $avatar = $this->avatars->createDefault($provider.':'.$subject, $publicId);
+                $created = new User();
+                $created->fill([
+                    'public_id' => $publicId,
+                    'username' => $username,
+                    'username_normalized' => mb_strtolower($username),
+                    'email' => null,
+                    'email_normalized' => null,
+                    'avatar_url' => $avatar['url'],
+                    'avatar_object_key' => $avatar['object_key'],
+                    'password_hash' => '',
+                    'status' => 'active',
+                    'email_verified_at' => null,
+                    'last_login_at' => date('Y-m-d H:i:s'),
+                ]);
+                $created->save();
+                $userIdentity = new UserIdentity();
+                $userIdentity->fill([
+                    'user_id' => $created->id,
+                    'provider' => $provider,
+                    'provider_subject' => $subject,
+                    'union_subject' => $identity['union_subject'],
+                    'metadata' => $identity['metadata'],
+                ]);
+                $userIdentity->save();
+                return $created;
+            });
+        }
+        return $this->loginResponse($user, $anonymousToken, $device, $provider);
     }
 
     public function register(array $data, string $anonymousToken, array $device): array
@@ -294,8 +350,20 @@ final class PlayerAuthBusiness
         }
         return $candidate;
     }
+
+    private function availablePlatformUsername(string $provider): string
+    {
+        $prefix = $provider === 'WECHAT_MINI_PROGRAM' ? 'wx_player' : 'dy_player';
+        do {
+            $candidate = $prefix.'_'.substr(bin2hex(random_bytes(4)), 0, 6);
+        } while (User::query()->where('username_normalized', $candidate)->exists());
+        return $candidate;
+    }
     private static function maskEmail(string $e): string
     {
+        if ($e === '') {
+            return 'platform-user';
+        }
         [$a, $b] = array_pad(explode('@', $e, 2), 2, '');
         return mb_substr($a, 0, 1).'***@'.$b;
     }

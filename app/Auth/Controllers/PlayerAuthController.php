@@ -32,6 +32,10 @@ final class PlayerAuthController extends BaseController
     {
         return $this->success((new PlayerAuthBusiness())->emailCodeLogin($request->post(), $this->anonymousToken($request), $this->device($request)));
     }
+    public function miniProgramLogin(Request $request): Response
+    {
+        return $this->success((new PlayerAuthBusiness())->miniProgramLogin($request->post(), $this->anonymousToken($request), $this->device($request)));
+    }
     public function refresh(Request $request): Response
     {
         return $this->success((new PlayerAuthBusiness())->refresh((string) $request->post('refresh_token')));

@@ -6,6 +6,8 @@
  * 结构：['表名' => [ ['列名' => 值, ...], ... ]]，值由预处理语句绑定，MySQL / PostgreSQL 通用。
  */
 
+$legalDocuments = require dirname(__DIR__, 4) . '/database/data/legal_documents.php';
+
 return [
     'sa_system_category' => [
         ['id' => 1, 'parent_id' => 0, 'level' => '0,', 'category_name' => '全部分类', 'sort' => 100, 'status' => 1, 'remark' => null, 'created_by' => 1, 'updated_by' => 1, 'create_time' => '2026-01-01 00:00:00', 'update_time' => '2026-01-01 00:00:00', 'delete_time' => null],
@@ -70,11 +72,14 @@ return [
         ['id' => 47, 'group_id' => 2, 'key' => 's3_use_path_style_endpoint', 'value' => '', 'name' => 'path_style_endpoint', 'input_type' => 'input', 'config_select_data' => '', 'sort' => 0, 'remark' => '', 'created_by' => 1, 'updated_by' => 1, 'create_time' => '2026-01-01 00:00:00', 'update_time' => '2026-01-01 00:00:00', 'delete_time' => null],
         ['id' => 48, 'group_id' => 2, 'key' => 's3_endpoint', 'value' => '', 'name' => 'endpoint', 'input_type' => 'input', 'config_select_data' => '', 'sort' => 0, 'remark' => '', 'created_by' => 1, 'updated_by' => 1, 'create_time' => '2026-01-01 00:00:00', 'update_time' => '2026-01-01 00:00:00', 'delete_time' => null],
         ['id' => 49, 'group_id' => 2, 'key' => 's3_acl', 'value' => '', 'name' => 'acl', 'input_type' => 'input', 'config_select_data' => '', 'sort' => 0, 'remark' => '', 'created_by' => 1, 'updated_by' => 1, 'create_time' => '2026-01-01 00:00:00', 'update_time' => '2026-01-01 00:00:00', 'delete_time' => null],
+        ['id' => 50, 'group_id' => 4, 'key' => 'service_terms', 'value' => $legalDocuments['service_terms'], 'name' => '服务条款', 'input_type' => 'wangEditor', 'config_select_data' => null, 'sort' => 100, 'remark' => '用户注册、登录或使用服务前展示的服务条款', 'created_by' => 1, 'updated_by' => 1, 'create_time' => '2026-01-01 00:00:00', 'update_time' => '2026-01-01 00:00:00', 'delete_time' => null],
+        ['id' => 51, 'group_id' => 4, 'key' => 'privacy_policy', 'value' => $legalDocuments['privacy_policy'], 'name' => '隐私政策', 'input_type' => 'wangEditor', 'config_select_data' => null, 'sort' => 99, 'remark' => '说明个人信息的收集、使用、存储与保护方式', 'created_by' => 1, 'updated_by' => 1, 'create_time' => '2026-01-01 00:00:00', 'update_time' => '2026-01-01 00:00:00', 'delete_time' => null],
     ],
     'sa_system_config_group' => [
         ['id' => 1, 'name' => '站点配置', 'code' => 'site_config', 'remark' => '', 'created_by' => 1, 'updated_by' => 1, 'create_time' => '2026-01-01 00:00:00', 'update_time' => '2026-01-01 00:00:00', 'delete_time' => null],
         ['id' => 2, 'name' => '上传配置', 'code' => 'upload_config', 'remark' => null, 'created_by' => 1, 'updated_by' => 1, 'create_time' => '2026-01-01 00:00:00', 'update_time' => '2026-01-01 00:00:00', 'delete_time' => null],
         ['id' => 3, 'name' => '邮件服务', 'code' => 'email_config', 'remark' => null, 'created_by' => 1, 'updated_by' => 1, 'create_time' => '2026-01-01 00:00:00', 'update_time' => '2026-01-01 00:00:00', 'delete_time' => null],
+        ['id' => 4, 'name' => '法律协议', 'code' => 'legal_config', 'remark' => '用户端展示的服务条款和隐私政策', 'created_by' => 1, 'updated_by' => 1, 'create_time' => '2026-01-01 00:00:00', 'update_time' => '2026-01-01 00:00:00', 'delete_time' => null],
     ],
     'sa_system_dept' => [
         ['id' => 1, 'parent_id' => 0, 'name' => '腾讯集团', 'code' => 'GROUP', 'leader_id' => 1, 'level' => '0,', 'sort' => 100, 'status' => 1, 'remark' => null, 'created_by' => 1, 'updated_by' => 1, 'create_time' => '2026-01-01 00:00:00', 'update_time' => '2026-01-01 00:00:00', 'delete_time' => null],

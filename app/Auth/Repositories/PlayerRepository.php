@@ -8,6 +8,7 @@ use App\Auth\Models\AnonymousMergeLog;
 use App\Auth\Models\AnonymousSession;
 use App\Auth\Models\RefreshSession;
 use App\Auth\Models\User;
+use App\Auth\Models\UserIdentity;
 use App\Game\Models\Game;
 
 final class PlayerRepository
@@ -15,6 +16,16 @@ final class PlayerRepository
     public function byEmail(string $email): ?User
     {
         $user = User::query()->where('email_normalized', $email)->first();
+        return $user instanceof User ? $user : null;
+    }
+
+    public function byIdentity(string $provider, string $subject): ?User
+    {
+        $identity = UserIdentity::query()->where('provider', $provider)->where('provider_subject', $subject)->first();
+        if (!$identity instanceof UserIdentity) {
+            return null;
+        }
+        $user = User::find((int) $identity->user_id);
         return $user instanceof User ? $user : null;
     }
 
