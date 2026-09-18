@@ -117,4 +117,21 @@ final class RoomLifecycleContractTest extends TestCase
         self::assertStringContainsString("\$this->broadcast(\$roomId, 'v1.room.next.started'", $webSocket);
         self::assertStringContainsString('$this->broadcastRoomSnapshots($roomId, $requestId);', $webSocket);
     }
+
+    public function testRoomClueSyncIsRelayedToOtherRoomMembersOnly(): void
+    {
+        $webSocket = file_get_contents(dirname(__DIR__, 2) . '/app/Game/WebSocket/GameWebSocket.php');
+
+        self::assertIsString($webSocket);
+        self::assertStringContainsString("if (\$event === 'v1.room.clue.sync')", $webSocket);
+        self::assertStringContainsString("\$clues = \$this->normalizeClues(\$payload['clues'] ?? null);", $webSocket);
+        self::assertStringContainsString("\$this->broadcast(\$roomId, 'v1.room.clue.sync', \$requestId, [", $webSocket);
+        self::assertStringContainsString("'clues' => \$clues,", $webSocket);
+        self::assertStringContainsString("'user_id' => \$context->userId,", $webSocket);
+        self::assertStringContainsString("\$connection->id);", $webSocket);
+        self::assertStringContainsString('private function normalizeClues(mixed $raw): array', $webSocket);
+        self::assertStringContainsString("throw new \\InvalidArgumentException('request.param_error');", $webSocket);
+        self::assertStringContainsString('count($raw) > 50', $webSocket);
+        self::assertStringContainsString('mb_strlen($clue) > 200', $webSocket);
+    }
 }

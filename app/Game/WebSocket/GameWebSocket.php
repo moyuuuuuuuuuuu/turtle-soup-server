@@ -197,6 +197,18 @@ final class GameWebSocket
 
             return;
         }
+        if ($event === 'v1.room.clue.sync') {
+            $clues = $this->normalizeClues($payload['clues'] ?? null);
+            $user = User::query()->find($context->userId);
+            $this->broadcast($roomId, 'v1.room.clue.sync', $requestId, [
+                'room_id' => $roomId,
+                'clues' => $clues,
+                'user_id' => $context->userId,
+                'username' => $user instanceof User ? $user->username : '玩家',
+            ], $connection->id);
+
+            return;
+        }
         if ($event === 'v1.room.leave') {
             $user = User::query()->find($context->userId);
             $reason = (string) ($payload['reason'] ?? 'manual');
@@ -275,6 +287,27 @@ final class GameWebSocket
             default => throw new \InvalidArgumentException('request.param_error'),
         };
         $this->broadcastRoomSnapshots($roomId, $requestId);
+    }
+
+    /** @return array<int, string> */
+    private function normalizeClues(mixed $raw): array
+    {
+        if (!is_array($raw) || count($raw) > 50) {
+            throw new \InvalidArgumentException('request.param_error');
+        }
+        $clues = [];
+        foreach ($raw as $clue) {
+            if (!is_string($clue)) {
+                throw new \InvalidArgumentException('request.param_error');
+            }
+            $clue = trim($clue);
+            if ($clue === '' || mb_strlen($clue) > 200) {
+                throw new \InvalidArgumentException('request.param_error');
+            }
+            $clues[] = $clue;
+        }
+
+        return $clues;
     }
 
     private function attach(TcpConnection $connection, string $roomId): void
