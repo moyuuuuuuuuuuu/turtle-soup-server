@@ -139,6 +139,10 @@ Route::group('/core', function () {
     Route::get('/donation/channels', [\App\Donation\Controllers\DonationAdminController::class, 'channels']);
     Route::post('/donation/channelUpdate', [\App\Donation\Controllers\DonationAdminController::class, 'channelUpdate']);
     Route::get('/donation/stats', [\App\Donation\Controllers\DonationAdminController::class, 'stats']);
+    Route::get('/friend-link/index', [\App\FriendLink\Controllers\FriendLinkAdminController::class, 'index']);
+    Route::post('/friend-link/save', [\App\FriendLink\Controllers\FriendLinkAdminController::class, 'save']);
+    Route::put('/friend-link/update', [\App\FriendLink\Controllers\FriendLinkAdminController::class, 'update']);
+    Route::delete('/friend-link/destroy', [\App\FriendLink\Controllers\FriendLinkAdminController::class, 'destroy']);
     Route::get('/room/index', [\App\Room\Controllers\RoomAdminController::class, 'index']);
     Route::get('/room/read', [\App\Room\Controllers\RoomAdminController::class, 'read']);
     Route::post('/room/close', [\App\Room\Controllers\RoomAdminController::class, 'close']);

@@ -57,6 +57,8 @@ enum ErrorCode: string implements ErrorCodeInterface
     case ROOM_LOGIN_REQUIRED = 'room.login_required';
     case DONATION_NOT_FOUND = 'donation.not_found';
     case DONATION_CHANNEL_INVALID = 'donation.channel_invalid';
+    case FRIEND_LINK_NOT_FOUND = 'friend_link.not_found';
+    case FRIEND_LINK_URL_INVALID = 'friend_link.url_invalid';
     case QUESTION_NOT_FOUND = 'question.not_found';
     case QUESTION_CONTENT_INCOMPLETE = 'question.content_incomplete';
     case QUESTION_STATUS_INVALID = 'question.status_invalid';
@@ -129,6 +131,8 @@ enum ErrorCode: string implements ErrorCodeInterface
             self::ROOM_LOGIN_REQUIRED => '登录后才能使用多人房间',
             self::DONATION_NOT_FOUND => '捐赠记录不存在',
             self::DONATION_CHANNEL_INVALID => '收款渠道配置无效',
+            self::FRIEND_LINK_NOT_FOUND => '友链不存在',
+            self::FRIEND_LINK_URL_INVALID => '友链地址无效',
             self::QUESTION_NOT_FOUND => '题目不存在',
             self::QUESTION_CONTENT_INCOMPLETE => '题目内容不完整',
             self::QUESTION_STATUS_INVALID => '题目状态不允许当前操作',
@@ -158,7 +162,8 @@ enum ErrorCode: string implements ErrorCodeInterface
             self::DATA_NOT_FOUND => 404,
             self::GAME_NOT_FOUND => 404,
             self::ROOM_NOT_FOUND,
-            self::DONATION_NOT_FOUND => 404,
+            self::DONATION_NOT_FOUND,
+            self::FRIEND_LINK_NOT_FOUND => 404,
             self::AUTH_ANONYMOUS_INVALID,
             self::AUTH_CREDENTIALS_INVALID,
             self::AUTH_TOKEN_INVALID,
@@ -192,7 +197,8 @@ enum ErrorCode: string implements ErrorCodeInterface
             self::ROOM_OWNER_REQUIRED,
             self::ROOM_LOGIN_REQUIRED => 403,
             self::ROOM_INVITE_INVALID,
-            self::DONATION_CHANNEL_INVALID => 422,
+            self::DONATION_CHANNEL_INVALID,
+            self::FRIEND_LINK_URL_INVALID => 422,
             self::QUESTION_STATUS_INVALID,
             self::QUESTION_VERSION_CONFLICT,
             self::QUESTION_COPY_FAILED,
@@ -268,6 +274,8 @@ enum ErrorCode: string implements ErrorCodeInterface
             self::ROOM_LOGIN_REQUIRED => ErrorModule::ROOM,
             self::DONATION_NOT_FOUND,
             self::DONATION_CHANNEL_INVALID => ErrorModule::DONATION,
+            self::FRIEND_LINK_NOT_FOUND,
+            self::FRIEND_LINK_URL_INVALID => ErrorModule::FRIEND_LINK,
             self::AI_WORKFLOW_TIMEOUT,
             self::AI_INVALID_RESPONSE,
             self::AI_AUTH_FAILED,
@@ -319,6 +327,8 @@ enum ErrorCode: string implements ErrorCodeInterface
             self::ROOM_LOGIN_REQUIRED,
             self::DONATION_NOT_FOUND,
             self::DONATION_CHANNEL_INVALID => ErrorSeverity::INFO,
+            self::FRIEND_LINK_NOT_FOUND,
+            self::FRIEND_LINK_URL_INVALID => ErrorSeverity::INFO,
             self::QUESTION_NOT_FOUND,
             self::QUESTION_CONTENT_INCOMPLETE,
             self::QUESTION_STATUS_INVALID,

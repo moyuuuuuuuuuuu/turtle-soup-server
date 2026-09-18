@@ -14,6 +14,7 @@ enum ErrorModule: string
     case GAME = 'game';
     case ROOM = 'room';
     case DONATION = 'donation';
+    case FRIEND_LINK = 'friend_link';
     case AI = 'ai';
     case COZE = 'coze';
     case WECHAT = 'wechat';

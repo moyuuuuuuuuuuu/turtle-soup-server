@@ -63,3 +63,4 @@ Route::post('/api/v1/rooms/next', [App\Room\Controllers\RoomController::class, '
 Route::post('/api/v1/rooms/leave', [App\Room\Controllers\RoomController::class, 'leave']);
 Route::post('/api/v1/rooms/close', [App\Room\Controllers\RoomController::class, 'close']);
 Route::get('/api/v1/donations', [App\Donation\Controllers\PublicDonationController::class, 'index']);
+Route::get('/api/v1/friend-links', [App\FriendLink\Controllers\PublicFriendLinkController::class, 'index']);
