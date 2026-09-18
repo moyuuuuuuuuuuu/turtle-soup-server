@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>后管友链功能对接文档 · 墨鱼海龟汤</title>
+    <link rel="stylesheet" href="css/friend-link-admin.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="toc">
+        <h2>目录</h2>
+        <ol>
+          <li><a href="#overview">目标与边界</a></li>
+          <li><a href="#template">申请模板映射</a></li>
+          <li><a href="#backend">后端现状</a></li>
+          <li><a href="#frontend-todo">前端要做什么</a></li>
+          <li><a href="#api">管理端 API 契约</a></li>
+          <li><a href="#files">建议文件结构</a></li>
+          <li><a href="#page-spec">页面交互规格</a></li>
+          <li><a href="#code">可直接粘贴的代码</a></li>
+          <li><a href="#menu">菜单与权限</a></li>
+          <li><a href="#acceptance">联调与验收</a></li>
+          <li><a href="#pitfalls">注意事项</a></li>
+        </ol>
+      </aside>
+
+      <main class="content">
+        <header class="hero">
+          <p class="eyebrow">Turtle Soup · Admin Integration</p>
+          <h1>后管前端如何配合实现友链功能</h1>
+          <p>
+            对照后端仓库 <code>turtle-soup-server</code> 已落地的友链模块，以及后管仓库
+            <code>turtle-soup-admin</code>（SaiAdmin / Vue3 / Element Plus）的既有约定，
+            说明管理端页面应如何实现「仅后台手工添加」的友链能力。
+          </p>
+          <div class="meta-row">
+            <span class="chip">后端：system-manage</span>
+            <span class="chip">前端：turtle-soup-admin</span>
+            <span class="chip">模式：仅后台维护</span>
+            <span class="chip">无用户端申请审批</span>
+          </div>
+        </header>
+
+        <section class="card" id="overview">
+          <h2>1. 目标与边界</h2>
+          <div class="note">
+            <strong>产品策略：</strong>友链只能由你在后管后台手工录入。系统
+            <strong>不提供</strong>用户端申请入口，也
+            <strong>不提供</strong>申请后的审核流。站外收到的申请模板由你人工筛选后，再在后台录入。
+          </div>
+          <div class="grid-2">
+            <div class="panel">
+              <h3>要做</h3>
+              <p>
+                后管「游戏运营 → 友链管理」列表页：查询、新增、编辑、删除、启停、排序。
+              </p>
+            </div>
+            <div class="panel">
+              <h3>不做</h3>
+              <p>
+                不要写用户端申请页、不要写「待审核」状态、不要暴露回链地址/联系邮箱到公开 API。
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" id="template">
+          <h2>2. 申请模板 ↔ 系统字段</h2>
+          <p>站外申请模板仍可继续使用；后管表单字段与之对齐：</p>
+          <pre><code>【墨鱼海龟汤 · 友链申请】
+站点名称：
+站点地址：
+Logo：
+一句话简介：
+回链地址：
+联系邮箱：</code></pre>
+          <table>
+            <thead>
+              <tr>
+                <th>申请模板</th>
+                <th>后管字段</th>
+                <th>数据库字段</th>
+                <th>必填</th>
+                <th>公开 API</th>
+                <th>说明</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>站点名称</td>
+                <td>name</td>
+                <td><code>name</code></td>
+                <td>是</td>
+                <td><span class="badge yes">是</span></td>
+                <td>≤ 80 字</td>
+              </tr>
+              <tr>
+                <td>站点地址</td>
+                <td>url</td>
+                <td><code>url</code></td>
+                <td>是</td>
+                <td><span class="badge yes">是</span></td>
+                <td>http/https，≤ 500</td>
+              </tr>
+              <tr>
+                <td>Logo</td>
+                <td>logo_url</td>
+                <td><code>logo_url</code></td>
+                <td>否</td>
+                <td><span class="badge yes">是</span></td>
+                <td>若填则必须 http/https</td>
+              </tr>
+              <tr>
+                <td>一句话简介</td>
+                <td>description</td>
+                <td><code>description</code></td>
+                <td>否</td>
+                <td><span class="badge yes">是</span></td>
+                <td>≤ 255 字</td>
+              </tr>
+              <tr>
+                <td>回链地址</td>
+                <td>reciprocal_url</td>
+                <td><code>reciprocal_url</code></td>
+                <td>否</td>
+                <td><span class="badge no">否</span></td>
+                <td>仅管理员核对回链用</td>
+              </tr>
+              <tr>
+                <td>联系邮箱</td>
+                <td>contact_email</td>
+                <td><code>contact_email</code></td>
+                <td>否</td>
+                <td><span class="badge no">否</span></td>
+                <td>格式校验，存库转小写</td>
+              </tr>
+              <tr>
+                <td>—</td>
+                <td>status</td>
+                <td><code>status</code></td>
+                <td>否（默认显示）</td>
+                <td><span class="badge no">否</span></td>
+                <td>true 显示 / false 隐藏</td>
+              </tr>
+              <tr>
+                <td>—</td>
+                <td>sort</td>
+                <td><code>sort</code></td>
+                <td>否（默认 0）</td>
+                <td><span class="badge no">否</span></td>
+                <td>数值越大越靠前</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="card" id="backend">
+          <h2>3. 后端现状（已提交）</h2>
+          <p>
+            提交：<code>1297736 feat: add admin-managed friend links</code>，分支
+            <code>main</code> → <code>origin/main</code>。
+          </p>
+          <ul>
+            <li>模块：<code>app/FriendLink/</code>（Model / Repository / Business / Format / Controllers）</li>
+            <li>
+              迁移：<code>database/migrations/20260828030000_create_friend_links.php</code>
+              （表 <code>turtle_friend_links</code> + 菜单 900220–900224）
+            </li>
+            <li>公开只读：<code>GET /api/v1/friend-links</code></li>
+            <li>
+              管理端 CRUD：
+              <code>/core/friend-link/index|save|update|destroy</code>
+            </li>
+            <li>
+              错误码：<code>friend_link.not_found</code>、<code>friend_link.url_invalid</code>
+            </li>
+          </ul>
+          <div class="note warn">
+            迁移文件已入库，但数据库尚未执行。前端联调前请先在后端环境跑 Phinx 迁移，并确认角色已拥有友链菜单权限。
+          </div>
+        </section>
+
+        <section class="card" id="frontend-todo">
+          <h2>4. 前端要做什么</h2>
+          <p>
+            请在 <code>turtle-soup-admin</code> 仓库（Vue3 + TS + Element Plus +
+            Art Design Pro / SaiAdmin）中，按既有 <strong>捐赠管理</strong> 模式新增友链页，不要另起一套框架设施。
+          </p>
+          <ol>
+            <li>
+              在 <code>src/api/operations.ts</code>（或独立
+              <code>src/api/friend-link.ts</code>）增加 <code>friendLinkAdminApi</code>
+              与类型。
+            </li>
+            <li>
+              新增页面 <code>src/views/friend-link/index.vue</code>，与捐赠页同构：
+              搜索条 + 表格 + 分页 + 编辑弹窗。
+            </li>
+            <li>
+              菜单由后端迁移写入：路径 <code>friend-link/index</code>，组件
+              <code>friend-link/index</code>，挂在「游戏运营」下。
+            </li>
+            <li>
+              按钮使用权限指令：
+              <code>v-permission="'friend_link:create'"</code>
+              等；最终以后端权限为准。
+            </li>
+            <li>
+              <strong>不要</strong>在用户端（uni-app <code>ui</code> 分支）做申请表单。
+            </li>
+          </ol>
+        </section>
+
+        <section class="card" id="api">
+          <h2>5. 管理端 API 契约</h2>
+          <p>
+            管理接口走 SaiAdmin 约定，开发代理
+            <code>VITE_API_URL=/api</code> → <code>VITE_API_PROXY_URL=http://hgt.test</code>
+            重写后命中后端 <code>/core/friend-link/*</code>。不要套用用户 API
+            <code>/api/v1/*</code> 的信封。
+          </p>
+
+          <h3>5.1 列表</h3>
+          <p><code>GET /core/friend-link/index</code></p>
+          <table>
+            <thead>
+              <tr>
+                <th>参数</th>
+                <th>类型</th>
+                <th>说明</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>page</td>
+                <td>number</td>
+                <td>默认 1</td>
+              </tr>
+              <tr>
+                <td>pageSize</td>
+                <td>number</td>
+                <td>默认 20，最大 100</td>
+              </tr>
+              <tr>
+                <td>keyword</td>
+                <td>string</td>
+                <td>模糊匹配名称 / 站点地址</td>
+              </tr>
+              <tr>
+                <td>status</td>
+                <td>boolean</td>
+                <td>可选；空串表示不过滤</td>
+              </tr>
+            </tbody>
+          </table>
+          <pre><code>{
+  "items": [
+    {
+      "id": 12,
+      "public_id": "000000000000000000000000AB",
+      "name": "示例站点",
+      "url": "https://example.com",
+      "logo_url": "https://example.com/logo.png",
+      "description": "伙伴站点",
+      "reciprocal_url": "https://example.com/backlink",
+      "contact_email": "owner@example.com",
+      "status": true,
+      "sort": 10,
+      "create_time": "2026-08-28 12:00:00",
+      "update_time": "2026-08-28 12:00:00"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "pageSize": 20
+}</code></pre>
+
+          <h3>5.2 新增</h3>
+          <p><code>POST /core/friend-link/save</code>，body 为 JSON：</p>
+          <pre><code>{
+  "name": "示例站点",
+  "url": "https://example.com",
+  "logo_url": "https://example.com/logo.png",
+  "description": "伙伴站点",
+  "reciprocal_url": "https://example.com/backlink",
+  "contact_email": "owner@example.com",
+  "status": true,
+  "sort": 10
+}</code></pre>
+
+          <h3>5.3 编辑</h3>
+          <p><code>PUT /core/friend-link/update</code>，body 必须带 <code>id</code>，其余字段同新增。</p>
+
+          <h3>5.4 删除</h3>
+          <p><code>DELETE /core/friend-link/destroy</code>，body：</p>
+          <pre><code>{ "ids": [12, 13] }</code></pre>
+
+          <h3>5.5 稳定错误码（可编程处理）</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>code</th>
+                <th>HTTP</th>
+                <th>含义</th>
+                <th>前端建议提示</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>friend_link.not_found</code></td>
+                <td>404</td>
+                <td>记录不存在</td>
+                <td>刷新列表</td>
+              </tr>
+              <tr>
+                <td><code>friend_link.url_invalid</code></td>
+                <td>422</td>
+                <td>站点/Logo/回链地址不合法</td>
+                <td>提示检查 URL</td>
+              </tr>
+              <tr>
+                <td><code>request.param_error</code></td>
+                <td>422</td>
+                <td>名称缺失、邮箱格式错误等</td>
+                <td>按 message 提示</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="note">
+            错误分支请读稳定英文 <code>code</code>，不要根据中文 message 做逻辑判断。
+          </div>
+
+          <h3>5.6 用户端公开接口（仅参考，后管不调用）</h3>
+          <p>
+            <code>GET /api/v1/friend-links</code> 返回用户端信封，data.items 仅含
+            <code>id/public_id/name/url/logo_url/description</code>，不含回链与邮箱。
+          </p>
+        </section>
+
+        <section class="card" id="files">
+          <h2>6. 建议文件结构</h2>
+          <p>与捐赠模块对齐，推荐：</p>
+          <pre><code>turtle-soup-admin/
+├── src/
+│   ├── api/
+│   │   └── operations.ts          # 追加 friendLinkAdminApi + 类型
+│   │                              # 或新建 src/api/friend-link.ts
+│   └── views/
+│       └── friend-link/
+│           └── index.vue          # 友链管理主页面（列表 + 编辑弹窗）</code></pre>
+          <p>
+            菜单由后端
+            <code>sa_system_menu.component = friend-link/index</code>
+            动态下发，前端只需保证视图路径可被路由解析为
+            <code>src/views/friend-link/index.vue</code>。
+          </p>
+        </section>
+
+        <section class="card" id="page-spec">
+          <h2>7. 页面交互规格</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>区域</th>
+                <th>交互</th>
+                <th>字段 / 行为</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>搜索条</td>
+                <td>keyword + 查询</td>
+                <td>可选 status 筛选（显示/隐藏）</td>
+              </tr>
+              <tr>
+                <td>操作按钮</td>
+                <td>新增友链</td>
+                <td><code>v-permission="'friend_link:create'"</code></td>
+              </tr>
+              <tr>
+                <td>表格列</td>
+                <td>名称、站点地址、Logo 预览、简介、回链、邮箱、状态、排序</td>
+                <td>地址可点击新窗口打开；Logo 缩略图</td>
+              </tr>
+              <tr>
+                <td>状态列</td>
+                <td>Tag</td>
+                <td>true=显示 / false=隐藏</td>
+              </tr>
+              <tr>
+                <td>行操作</td>
+                <td>编辑 / 删除</td>
+                <td>权限 <code>friend_link:update</code> / <code>friend_link:delete</code></td>
+              </tr>
+              <tr>
+                <td>编辑弹窗</td>
+                <td>表单校验</td>
+                <td>见下方规则</td>
+              </tr>
+              <tr>
+                <td>成功反馈</td>
+                <td>Message + 重载列表</td>
+                <td>与捐赠页一致</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>表单校验（与后端一致）</h3>
+          <ul>
+            <li><code>name</code>：必填，长度 1–80</li>
+            <li><code>url</code>：必填，http/https</li>
+            <li><code>logo_url</code> / <code>reciprocal_url</code>：选填；非空则 http/https</li>
+            <li><code>contact_email</code>：选填；非空则邮箱格式</li>
+            <li><code>description</code>：选填，≤ 255</li>
+            <li><code>status</code>：开关，默认 true</li>
+            <li><code>sort</code>：整数，默认 0</li>
+          </ul>
+        </section>
+
+        <section class="card" id="code">
+          <h2>8. 可直接粘贴的代码</h2>
+
+          <h3>8.1 API 模块（追加到 <code>src/api/operations.ts</code>）</h3>
+          <pre><code>export interface FriendLinkRow {
+  id: number
+  public_id: string
+  name: string
+  url: string
+  logo_url?: string | null
+  description?: string | null
+  reciprocal_url?: string | null
+  contact_email?: string | null
+  status: boolean
+  sort: number
+  create_time: string
+  update_time: string
+}
+
+export interface FriendLinkForm {
+  id?: number
+  name: string
+  url: string
+  logo_url?: string
+  description?: string
+  reciprocal_url?: string
+  contact_email?: string
+  status: boolean
+  sort: number
+}
+
+export const friendLinkAdminApi = {
+  list: (params: Record&lt;string, unknown&gt;) =&gt;
+    request.get&lt;{ items: FriendLinkRow[]; total: number }&gt;({
+      url: '/core/friend-link/index',
+      params
+    }),
+  save: (data: FriendLinkForm) =&gt;
+    request.post({ url: '/core/friend-link/save', data }),
+  update: (data: FriendLinkForm) =&gt;
+    request.put({ url: '/core/friend-link/update', data }),
+  destroy: (ids: number[]) =&gt;
+    request.del({ url: '/core/friend-link/destroy', data: { ids } })
+}</code></pre>
+
+          <h3>8.2 页面骨架 <code>src/views/friend-link/index.vue</code></h3>
+          <pre><code>&lt;template&gt;
+  &lt;div class="page-content"&gt;
+    &lt;ElCard shadow="never"&gt;
+      &lt;div class="mb-4 flex gap-3"&gt;
+        &lt;ElInput v-model="query.keyword" clearable placeholder="站点名称 / 地址" class="w-60" /&gt;
+        &lt;ElSelect v-model="query.status" clearable placeholder="状态" class="w-36"&gt;
+          &lt;ElOption label="显示" :value="true" /&gt;
+          &lt;ElOption label="隐藏" :value="false" /&gt;
+        &lt;/ElSelect&gt;
+        &lt;ElButton type="primary" @click="load"&gt;查询&lt;/ElButton&gt;
+        &lt;ElButton v-permission="'friend_link:create'" @click="open()"&gt;新增友链&lt;/ElButton&gt;
+      &lt;/div&gt;
+
+      &lt;ElTable :data="rows"&gt;
+        &lt;ElTableColumn prop="name" label="站点名称" min-width="140" /&gt;
+        &lt;ElTableColumn label="站点地址" min-width="220"&gt;
+          &lt;template #default="{ row }"&gt;
+            &lt;a :href="row.url" target="_blank" rel="noopener noreferrer"&gt;{{ row.url }}&lt;/a&gt;
+          &lt;/template&gt;
+        &lt;/ElTableColumn&gt;
+        &lt;ElTableColumn label="Logo" width="100"&gt;
+          &lt;template #default="{ row }"&gt;
+            &lt;img v-if="row.logo_url" :src="row.logo_url" class="h-8 max-w-16 object-contain" alt="" /&gt;
+          &lt;/template&gt;
+        &lt;/ElTableColumn&gt;
+        &lt;ElTableColumn prop="description" label="简介" min-width="160" show-overflow-tooltip /&gt;
+        &lt;ElTableColumn prop="reciprocal_url" label="回链地址" min-width="180" show-overflow-tooltip /&gt;
+        &lt;ElTableColumn prop="contact_email" label="联系邮箱" min-width="160" /&gt;
+        &lt;ElTableColumn label="状态" width="80"&gt;
+          &lt;template #default="{ row }"&gt;
+            &lt;ElTag :type="row.status ? 'success' : 'info'"&gt;
+              {{ row.status ? '显示' : '隐藏' }}
+            &lt;/ElTag&gt;
+          &lt;/template&gt;
+        &lt;/ElTableColumn&gt;
+        &lt;ElTableColumn prop="sort" label="排序" width="80" /&gt;
+        &lt;ElTableColumn label="操作" width="140" fixed="right"&gt;
+          &lt;template #default="{ row }"&gt;
+            &lt;ElButton link @click="open(row)"&gt;编辑&lt;/ElButton&gt;
+            &lt;ElButton link type="danger" @click="remove(row)"&gt;删除&lt;/ElButton&gt;
+          &lt;/template&gt;
+        &lt;/ElTableColumn&gt;
+      &lt;/ElTable&gt;
+
+      &lt;ElPagination
+        class="mt-4 justify-end"
+        layout="total, prev, pager, next"
+        :total="total"
+        :page-size="query.pageSize"
+        @current-change="(page: number) =&gt; { query.page = page; load() }"
+      /&gt;
+    &lt;/ElCard&gt;
+
+    &lt;ElDialog v-model="editVisible" :title="form.id ? '编辑友链' : '新增友链'" width="560px"&gt;
+      &lt;ElForm ref="formRef" :model="form" :rules="rules" label-width="100px"&gt;
+        &lt;ElFormItem label="站点名称" prop="name"&gt;
+          &lt;ElInput v-model="form.name" maxlength="80" show-word-limit /&gt;
+        &lt;/ElFormItem&gt;
+        &lt;ElFormItem label="站点地址" prop="url"&gt;
+          &lt;ElInput v-model="form.url" placeholder="https://" /&gt;
+        &lt;/ElFormItem&gt;
+        &lt;ElFormItem label="Logo" prop="logo_url"&gt;
+          &lt;ElInput v-model="form.logo_url" placeholder="https://（选填）" /&gt;
+        &lt;/ElFormItem&gt;
+        &lt;ElFormItem label="一句话简介" prop="description"&gt;
+          &lt;ElInput v-model="form.description" maxlength="255" show-word-limit /&gt;
+        &lt;/ElFormItem&gt;
+        &lt;ElFormItem label="回链地址" prop="reciprocal_url"&gt;
+          &lt;ElInput v-model="form.reciprocal_url" placeholder="对方站点上的回链（选填）" /&gt;
+        &lt;/ElFormItem&gt;
+        &lt;ElFormItem label="联系邮箱" prop="contact_email"&gt;
+          &lt;ElInput v-model="form.contact_email" placeholder="选填" /&gt;
+        &lt;/ElFormItem&gt;
+        &lt;ElFormItem label="前台显示"&gt;
+          &lt;ElSwitch v-model="form.status" /&gt;
+        &lt;/ElFormItem&gt;
+        &lt;ElFormItem label="排序"&gt;
+          &lt;ElInputNumber v-model="form.sort" :min="0" /&gt;
+        &lt;/ElFormItem&gt;
+      &lt;/ElForm&gt;
+      &lt;template #footer&gt;
+        &lt;ElButton @click="editVisible = false"&gt;取消&lt;/ElButton&gt;
+        &lt;ElButton type="primary" @click="save"&gt;保存&lt;/ElButton&gt;
+      &lt;/template&gt;
+    &lt;/ElDialog&gt;
+  &lt;/div&gt;
+&lt;/template&gt;
+
+&lt;script setup lang="ts"&gt;
+  import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+  import {
+    friendLinkAdminApi,
+    type FriendLinkForm,
+    type FriendLinkRow
+  } from '@/api/operations'
+
+  const rows = ref&lt;FriendLinkRow[]&gt;([])
+  const total = ref(0)
+  const editVisible = ref(false)
+  const formRef = ref&lt;FormInstance&gt;()
+  const query = reactive({
+    keyword: '',
+    status: undefined as boolean | undefined,
+    page: 1,
+    pageSize: 20
+  })
+
+  const emptyForm = (): FriendLinkForm =&gt; ({
+    name: '',
+    url: '',
+    logo_url: '',
+    description: '',
+    reciprocal_url: '',
+    contact_email: '',
+    status: true,
+    sort: 0
+  })
+  const form = reactive&lt;FriendLinkForm&gt;(emptyForm())
+
+  const isHttpUrl = (value: string) =&gt;
+    !value || /^https?:\/\/.+/i.test(value)
+
+  const rules: FormRules = {
+    name: [{ required: true, message: '请输入站点名称', trigger: 'blur' }],
+    url: [
+      { required: true, message: '请输入站点地址', trigger: 'blur' },
+      { validator: (_r, value, cb) =&gt; (isHttpUrl(String(value || '')) ? cb() : cb(new Error('必须是 http/https 地址'))), trigger: 'blur' }
+    ],
+    logo_url: [
+      { validator: (_r, value, cb) =&gt; (isHttpUrl(String(value || '')) ? cb() : cb(new Error('Logo 地址必须是 http/https'))), trigger: 'blur' }
+    ],
+    reciprocal_url: [
+      { validator: (_r, value, cb) =&gt; (isHttpUrl(String(value || '')) ? cb() : cb(new Error('回链地址必须是 http/https'))), trigger: 'blur' }
+    ],
+    contact_email: [
+      {
+        validator: (_r, value, cb) =&gt; {
+          const v = String(value || '')
+          cb(!v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? undefined : new Error('联系邮箱格式不正确'))
+        },
+        trigger: 'blur'
+      }
+    ]
+  }
+
+  async function load() {
+    const params: Record&lt;string, unknown&gt; = {
+      keyword: query.keyword,
+      page: query.page,
+      pageSize: query.pageSize
+    }
+    if (query.status !== undefined) params.status = query.status
+    const data = await friendLinkAdminApi.list(params)
+    rows.value = data.items
+    total.value = data.total
+  }
+
+  function open(row?: FriendLinkRow) {
+    Object.assign(form, emptyForm(), row ? { ...row, logo_url: row.logo_url || '', description: row.description || '', reciprocal_url: row.reciprocal_url || '', contact_email: row.contact_email || '' } : {})
+    editVisible.value = true
+  }
+
+  async function save() {
+    await formRef.value?.validate()
+    const payload = { ...form }
+    if (!payload.logo_url) payload.logo_url = ''
+    if (!payload.description) payload.description = ''
+    if (!payload.reciprocal_url) payload.reciprocal_url = ''
+    if (!payload.contact_email) payload.contact_email = ''
+    if (form.id) {
+      await friendLinkAdminApi.update(payload)
+    } else {
+      await friendLinkAdminApi.save(payload)
+    }
+    editVisible.value = false
+    ElMessage.success('保存成功')
+    await load()
+  }
+
+  async function remove(row: FriendLinkRow) {
+    await ElMessageBox.confirm(`确定删除友链「${row.name}」？`)
+    await friendLinkAdminApi.destroy([row.id])
+    ElMessage.success('删除成功')
+    await load()
+  }
+
+  onMounted(load)
+&lt;/script&gt;</code></pre>
+        </section>
+
+        <section class="card" id="menu">
+          <h2>9. 菜单与权限</h2>
+          <p>后端迁移已预留菜单（父级为「游戏运营」900200）：</p>
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>名称</th>
+                <th>type</th>
+                <th>path / slug</th>
+                <th>component</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>900220</td>
+                <td>友链管理</td>
+                <td>菜单</td>
+                <td><code>friend-link/index</code></td>
+                <td><code>friend-link/index</code></td>
+              </tr>
+              <tr>
+                <td>900221</td>
+                <td>友链列表</td>
+                <td>权限</td>
+                <td><code>friend_link:index</code></td>
+                <td>—</td>
+              </tr>
+              <tr>
+                <td>900222</td>
+                <td>新增友链</td>
+                <td>权限</td>
+                <td><code>friend_link:create</code></td>
+                <td>—</td>
+              </tr>
+              <tr>
+                <td>900223</td>
+                <td>编辑友链</td>
+                <td>权限</td>
+                <td><code>friend_link:update</code></td>
+                <td>—</td>
+              </tr>
+              <tr>
+                <td>900224</td>
+                <td>删除友链</td>
+                <td>权限</td>
+                <td><code>friend_link:delete</code></td>
+                <td>—</td>
+              </tr>
+            </tbody>
+          </table>
+          <p>
+            Super Admin 角色由 <code>ProjectAdminMenuSeeder</code> 自动补齐上述菜单。若使用其他角色，需在后管「角色管理」中勾选友链菜单与按钮权限。
+          </p>
+          <div class="note">
+            前端 <code>v-permission</code> 只是展示层辅助；真正拦截在后端
+            <code>#[Permission(...)]</code> 与 <code>CheckAuth</code> 中间件。
+          </div>
+        </section>
+
+        <section class="card" id="acceptance">
+          <h2>10. 联调与验收</h2>
+          <h3>前置</h3>
+          <ol>
+            <li>后端迁移已执行，表 <code>turtle_friend_links</code> 可用。</li>
+            <li>后管登录账号拥有友链菜单权限。</li>
+            <li><code>pnpm dev</code> 代理指向本地/开发后端（如 <code>http://hgt.test</code>）。</li>
+            <li>Webman 进程已加载新路由（必要时 reload）。</li>
+          </ol>
+          <h3>验收清单</h3>
+          <ol>
+            <li>侧边栏「游戏运营 → 友链管理」可打开列表页。</li>
+            <li>按申请模板六字段 + 状态/排序新增一条友链，列表可见。</li>
+            <li>编辑可改全部字段；删除二次确认后消失。</li>
+            <li>非 http/https 地址、空名称、非法邮箱会提示错误。</li>
+            <li>
+              用户端（或 curl）访问
+              <code>GET /api/v1/friend-links</code>：
+              仅返回启用中记录，且不含
+              <code>reciprocal_url</code>、<code>contact_email</code>。
+            </li>
+            <li>隐藏（status=false）后，公开接口不再返回该友链。</li>
+            <li>排序大的友链在公开列表中更靠前。</li>
+            <li>无权限账号看不到友链菜单，直接调管理接口返回鉴权失败。</li>
+          </ol>
+        </section>
+
+        <section class="card" id="pitfalls">
+          <h2>11. 注意事项</h2>
+          <ul>
+            <li>
+              <strong>无申请流：</strong>不要给后管加「待审核友链」页面，也不要在
+              <code>ui</code> 用户端做申请表单。
+            </li>
+            <li>
+              <strong>字段边界：</strong>回链、邮箱只服务管理员核对，公开 API 已屏蔽；前端表格可展示，但不要透传到用户端模块。
+            </li>
+            <li>
+              <strong>响应信封：</strong>管理接口沿用 SaiAdmin 现有 request 封装；公开接口才是
+              <code>code/message/data/request_id/timestamp</code>。
+            </li>
+            <li>
+              <strong>错误处理：</strong>分支判断用稳定英文
+              <code>code</code>，不要匹配中文文案。
+            </li>
+            <li>
+              <strong>仓库边界：</strong>本功能 PHP 与迁移只在
+              <code>turtle-soup-server</code>；Vue 页面与 API 类型只在
+              <code>turtle-soup-admin</code>。
+            </li>
+            <li>
+              <strong>Upstream：</strong>保持 SaiAdmin MIT 与既有权限/菜单设施，不要批量重写上游文件。
+            </li>
+          </ul>
+        </section>
+
+        <p class="footer">
+          文档对应后端提交 <code>1297736</code> · 后管仓库
+          <a href="https://github.com/moyuuuuuuuuuuu/turtle-soup-admin" target="_blank" rel="noopener noreferrer">moyuuuuuuuuuuu/turtle-soup-admin</a>
+          · 请结合实际鉴权中间件与 request 封装微调示例代码。
+        </p>
+      </main>
+    </div>
+    <script src="js/friend-link-admin.js"></script>
+  </body>
+</html>
