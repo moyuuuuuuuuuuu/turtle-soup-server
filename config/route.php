@@ -44,6 +44,7 @@ Route::delete('/api/v1/me/sessions', [App\Auth\Controllers\PlayerAuthController:
 Route::get('/api/v1/questions', [App\Question\Controllers\PublicQuestionController::class, 'index']);
 Route::get('/api/v1/questions/read', [App\Question\Controllers\PublicQuestionController::class, 'read']);
 Route::get('/api/v1/questions/random', [App\Question\Controllers\PublicQuestionController::class, 'random']);
+Route::get('/api/v1/tags', [App\Question\Controllers\PublicTagController::class, 'index']);
 Route::post('/api/v1/games', [App\Game\Controllers\GameController::class, 'create']);
 Route::get('/api/v1/games/read', [App\Game\Controllers\GameController::class, 'read']);
 Route::get('/api/v1/games/history', [App\Game\Controllers\GameController::class, 'history']);
