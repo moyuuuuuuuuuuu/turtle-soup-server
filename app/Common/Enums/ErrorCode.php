@@ -41,6 +41,14 @@ enum ErrorCode: string implements ErrorCodeInterface
     case AUTH_MINI_PROGRAM_PLATFORM_INVALID = 'auth.mini_program_platform_invalid';
     case AUTH_MINI_PROGRAM_NOT_CONFIGURED = 'auth.mini_program_not_configured';
     case AUTH_MINI_PROGRAM_LOGIN_FAILED = 'auth.mini_program_login_failed';
+    case AUTH_IDENTITY_BOUND = 'auth.identity_bound';
+    case AUTH_IDENTITY_NOT_FOUND = 'auth.identity_not_found';
+    case AUTH_IDENTITY_ALREADY_BOUND = 'auth.identity_already_bound';
+    case AUTH_IDENTITY_LAST_LOGIN_METHOD = 'auth.identity_last_login_method';
+    case AUTH_THIRD_PARTY_PLATFORM_INVALID = 'auth.third_party_platform_invalid';
+    case AUTH_THIRD_PARTY_NOT_CONFIGURED = 'auth.third_party_not_configured';
+    case AUTH_THIRD_PARTY_LOGIN_FAILED = 'auth.third_party_login_failed';
+    case AUTH_THIRD_PARTY_NOT_READY = 'auth.third_party_not_ready';
     case GAME_NOT_FOUND = 'game.not_found';
     case GAME_STATUS_INVALID = 'game.status_invalid';
     case GAME_QUESTION_LIMIT_REACHED = 'game.question_limit_reached';
@@ -115,6 +123,14 @@ enum ErrorCode: string implements ErrorCodeInterface
             self::AUTH_MINI_PROGRAM_PLATFORM_INVALID => '不支持的小程序平台',
             self::AUTH_MINI_PROGRAM_NOT_CONFIGURED => '小程序登录尚未配置',
             self::AUTH_MINI_PROGRAM_LOGIN_FAILED => '小程序授权登录失败，请重试',
+            self::AUTH_IDENTITY_BOUND => '该第三方账号已绑定其他玩家账号',
+            self::AUTH_IDENTITY_NOT_FOUND => '未找到对应的第三方绑定',
+            self::AUTH_IDENTITY_ALREADY_BOUND => '该第三方账号已绑定当前账号',
+            self::AUTH_IDENTITY_LAST_LOGIN_METHOD => '当前账号仅剩此登录方式，无法解绑',
+            self::AUTH_THIRD_PARTY_PLATFORM_INVALID => '不支持的第三方登录平台',
+            self::AUTH_THIRD_PARTY_NOT_CONFIGURED => '第三方登录尚未配置',
+            self::AUTH_THIRD_PARTY_LOGIN_FAILED => '第三方授权登录失败，请重试',
+            self::AUTH_THIRD_PARTY_NOT_READY => '该第三方登录方式尚未开放',
             self::GAME_NOT_FOUND => '游戏不存在',
             self::GAME_STATUS_INVALID => '当前游戏状态不允许此操作',
             self::GAME_QUESTION_LIMIT_REACHED => '提问次数已用完，请提交最终猜测',
@@ -177,6 +193,14 @@ enum ErrorCode: string implements ErrorCodeInterface
             self::AUTH_MINI_PROGRAM_PLATFORM_INVALID => 422,
             self::AUTH_MINI_PROGRAM_LOGIN_FAILED => 401,
             self::AUTH_MINI_PROGRAM_NOT_CONFIGURED => 503,
+            self::AUTH_THIRD_PARTY_PLATFORM_INVALID => 422,
+            self::AUTH_THIRD_PARTY_LOGIN_FAILED => 401,
+            self::AUTH_THIRD_PARTY_NOT_CONFIGURED,
+            self::AUTH_THIRD_PARTY_NOT_READY => 503,
+            self::AUTH_IDENTITY_NOT_FOUND => 404,
+            self::AUTH_IDENTITY_BOUND,
+            self::AUTH_IDENTITY_ALREADY_BOUND,
+            self::AUTH_IDENTITY_LAST_LOGIN_METHOD => 409,
             self::AUTH_USERNAME_EXISTS,
             self::AUTH_EMAIL_EXISTS,
             self::AUTH_USERNAME_CHANGE_LIMITED,
@@ -257,7 +281,15 @@ enum ErrorCode: string implements ErrorCodeInterface
             self::AUTH_ANONYMOUS_MERGE_FAILED => ErrorModule::AUTH,
             self::AUTH_MINI_PROGRAM_PLATFORM_INVALID,
             self::AUTH_MINI_PROGRAM_NOT_CONFIGURED,
-            self::AUTH_MINI_PROGRAM_LOGIN_FAILED => ErrorModule::AUTH,
+            self::AUTH_MINI_PROGRAM_LOGIN_FAILED,
+            self::AUTH_IDENTITY_BOUND,
+            self::AUTH_IDENTITY_NOT_FOUND,
+            self::AUTH_IDENTITY_ALREADY_BOUND,
+            self::AUTH_IDENTITY_LAST_LOGIN_METHOD,
+            self::AUTH_THIRD_PARTY_PLATFORM_INVALID,
+            self::AUTH_THIRD_PARTY_NOT_CONFIGURED,
+            self::AUTH_THIRD_PARTY_LOGIN_FAILED,
+            self::AUTH_THIRD_PARTY_NOT_READY => ErrorModule::AUTH,
             self::GAME_NOT_FOUND,
             self::GAME_STATUS_INVALID,
             self::GAME_QUESTION_LIMIT_REACHED,
@@ -311,6 +343,12 @@ enum ErrorCode: string implements ErrorCodeInterface
             self::AUTH_ANONYMOUS_MERGE_FAILED,
             self::AUTH_MINI_PROGRAM_PLATFORM_INVALID,
             self::AUTH_MINI_PROGRAM_LOGIN_FAILED,
+            self::AUTH_IDENTITY_BOUND,
+            self::AUTH_IDENTITY_NOT_FOUND,
+            self::AUTH_IDENTITY_ALREADY_BOUND,
+            self::AUTH_IDENTITY_LAST_LOGIN_METHOD,
+            self::AUTH_THIRD_PARTY_PLATFORM_INVALID,
+            self::AUTH_THIRD_PARTY_LOGIN_FAILED,
             self::GAME_NOT_FOUND,
             self::GAME_STATUS_INVALID,
             self::GAME_QUESTION_LIMIT_REACHED,
@@ -344,6 +382,8 @@ enum ErrorCode: string implements ErrorCodeInterface
             self::SYSTEM_BUSY,
             self::SYSTEM_MAINTENANCE,
             self::AUTH_MINI_PROGRAM_NOT_CONFIGURED,
+            self::AUTH_THIRD_PARTY_NOT_CONFIGURED,
+            self::AUTH_THIRD_PARTY_NOT_READY,
             self::THIRD_PARTY_ERROR => ErrorSeverity::WARNING,
             self::STORAGE_UPLOAD_FAILED => ErrorSeverity::ERROR,
             self::AI_WORKFLOW_TIMEOUT => ErrorSeverity::WARNING,

@@ -36,6 +36,41 @@ final class PlayerAuthController extends BaseController
     {
         return $this->success((new PlayerAuthBusiness())->miniProgramLogin($request->post(), $this->anonymousToken($request), $this->device($request)));
     }
+    public function wechatOfficialLogin(Request $request): Response
+    {
+        return $this->success((new PlayerAuthBusiness())->wechatOfficialLogin($request->post(), $this->anonymousToken($request), $this->device($request)));
+    }
+    public function wechatOfficialAuthorizeUrl(Request $request): Response
+    {
+        return $this->success((new PlayerAuthBusiness())->wechatOfficialAuthorizeUrl($request->get()));
+    }
+    public function openPlatformLogin(Request $request): Response
+    {
+        return $this->success((new PlayerAuthBusiness())->openPlatformLogin($request->post(), $this->anonymousToken($request), $this->device($request)));
+    }
+    public function identities(Request $request): Response
+    {
+        return $this->success((new PlayerAuthBusiness())->identities($this->context($request)));
+    }
+    public function bindMiniProgramIdentity(Request $request): Response
+    {
+        return $this->success((new PlayerAuthBusiness())->bindMiniProgramIdentity($this->context($request), $request->post()));
+    }
+    public function bindWechatOfficialIdentity(Request $request): Response
+    {
+        return $this->success((new PlayerAuthBusiness())->bindWechatOfficialIdentity($this->context($request), $request->post()));
+    }
+    public function bindOpenPlatformIdentity(Request $request): Response
+    {
+        return $this->success((new PlayerAuthBusiness())->bindOpenPlatformIdentity($this->context($request), $request->post()));
+    }
+    public function unbindIdentity(Request $request): Response
+    {
+        $provider = trim((string) ($request->get('provider', ''))) !== ''
+            ? (string) $request->get('provider')
+            : (string) $request->post('provider', '');
+        return $this->success((new PlayerAuthBusiness())->unbindIdentity($this->context($request), $provider));
+    }
     public function refresh(Request $request): Response
     {
         return $this->success((new PlayerAuthBusiness())->refresh((string) $request->post('refresh_token')));

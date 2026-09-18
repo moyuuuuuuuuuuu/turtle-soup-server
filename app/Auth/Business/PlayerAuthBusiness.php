@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Auth\Business;
 
 use App\Auth\Entities\PlayerContext;
+use App\Auth\Enums\IdentityProvider;
 use App\Auth\Formats\PlayerFormat;
-use App\Auth\Models\AnonymousSession;
 use App\Auth\Models\RefreshSession;
 use App\Auth\Models\User;
 use App\Auth\Models\UserIdentity;
@@ -15,7 +15,9 @@ use App\Auth\Repositories\PlayerRepository;
 use App\Auth\Services\BosAvatarService;
 use App\Auth\Services\EmailCodeService;
 use App\Auth\Services\MiniProgramLoginService;
+use App\Auth\Services\OpenPlatformLoginService;
 use App\Auth\Services\PlayerTokenService;
+use App\Auth\Services\WeChatOfficialAccountLoginService;
 use App\Common\Enums\ErrorCode;
 use App\Common\Exceptions\BaseException;
 use App\Common\Support\PublicId;
@@ -25,62 +27,163 @@ use Webman\Http\UploadFile;
 
 final class PlayerAuthBusiness
 {
-    public function __construct(private readonly PlayerRepository $repository = new PlayerRepository(), private readonly PlayerTokenService $tokens = new PlayerTokenService(), private readonly EmailCodeService $codes = new EmailCodeService(), private readonly BosAvatarService $avatars = new BosAvatarService(), private readonly MiniProgramLoginService $miniPrograms = new MiniProgramLoginService())
+    public function __construct(private readonly PlayerRepository $repository = new PlayerRepository(), private readonly PlayerTokenService $tokens = new PlayerTokenService(), private readonly EmailCodeService $codes = new EmailCodeService(), private readonly BosAvatarService $avatars = new BosAvatarService(), private readonly MiniProgramLoginService $miniPrograms = new MiniProgramLoginService(), private readonly OpenPlatformLoginService $openPlatforms = new OpenPlatformLoginService(), private readonly WeChatOfficialAccountLoginService $wechatOfficial = new WeChatOfficialAccountLoginService())
     {
     }
 
     /**
+     * Cold login for mini programs: reuse the user bound to provider+openid; create once otherwise.
+     *
      * @param array<string,mixed> $data
      * @param array{string,string,string,string} $device
      * @return array<string,mixed>
      */
     public function miniProgramLogin(array $data, string $anonymousToken, array $device): array
     {
+        $platform = trim((string) ($data['platform'] ?? ''));
+        if ($platform === '') {
+            ErrorCode::AUTH_MINI_PROGRAM_PLATFORM_INVALID->throw();
+        }
         $identity = $this->miniPrograms->exchange(
-            trim((string) ($data['platform'] ?? '')),
+            $platform,
             (string) ($data['code'] ?? ''),
             (string) ($data['anonymous_code'] ?? '')
         );
-        $provider = $identity['provider']->value;
-        $subject = $identity['subject'];
-        $user = $this->repository->byIdentity($provider, $subject);
-        if (!$user instanceof User) {
-            $user = Db::transaction(function () use ($identity, $provider, $subject): User {
-                $existing = $this->repository->byIdentity($provider, $subject);
-                if ($existing instanceof User) {
-                    return $existing;
-                }
-                $publicId = PublicId::make();
-                $username = $this->availablePlatformUsername($identity['provider']->name);
-                $avatar = $this->avatars->createDefault($provider.':'.$subject, $publicId);
-                $created = new User();
-                $created->fill([
-                    'public_id' => $publicId,
-                    'username' => $username,
-                    'username_normalized' => mb_strtolower($username),
-                    'email' => null,
-                    'email_normalized' => null,
-                    'avatar_url' => $avatar['url'],
-                    'avatar_object_key' => $avatar['object_key'],
-                    'password_hash' => '',
-                    'status' => 'active',
-                    'email_verified_at' => null,
-                    'last_login_at' => date('Y-m-d H:i:s'),
-                ]);
-                $created->save();
-                $userIdentity = new UserIdentity();
-                $userIdentity->fill([
-                    'user_id' => $created->id,
-                    'provider' => $provider,
-                    'provider_subject' => $subject,
-                    'union_subject' => $identity['union_subject'],
-                    'metadata' => $identity['metadata'],
-                ]);
-                $userIdentity->save();
-                return $created;
-            });
+        $user = $this->resolveOrCreateUserByIdentity($identity);
+        return $this->loginResponse($user, $anonymousToken, $device, $identity['provider']->value);
+    }
+
+    /**
+     * WeChat Official Account OAuth cold login (公众号网页授权).
+     * provider = wechat_official_account; openid is distinct from mini-program openid.
+     *
+     * @param array<string,mixed> $data
+     * @param array{string,string,string,string} $device
+     * @return array<string,mixed>
+     */
+    public function wechatOfficialLogin(array $data, string $anonymousToken, array $device): array
+    {
+        $identity = $this->wechatOfficial->exchange((string) ($data['code'] ?? ''));
+        $user = $this->resolveOrCreateUserByIdentity($identity);
+        return $this->loginResponse($user, $anonymousToken, $device, $identity['provider']->value);
+    }
+
+    /** @return array{authorize_url:string,state:string,scope:string} */
+    public function wechatOfficialAuthorizeUrl(array $data): array
+    {
+        return $this->wechatOfficial->authorizeUrl(
+            (string) ($data['redirect_uri'] ?? ''),
+            (string) ($data['state'] ?? ''),
+            (string) ($data['scope'] ?? '')
+        );
+    }
+
+    /**
+     * Cold login placeholder for future WeChat / Douyin open-platform OAuth.
+     * Uses the same identity table and provider+subject resolution as mini-program login.
+     *
+     * @param array<string,mixed> $data
+     * @param array{string,string,string,string} $device
+     * @return array<string,mixed>
+     */
+    public function openPlatformLogin(array $data, string $anonymousToken, array $device): array
+    {
+        $identity = $this->openPlatforms->exchange(
+            trim((string) ($data['platform'] ?? '')),
+            [
+                'code' => (string) ($data['code'] ?? ''),
+                'redirect_uri' => (string) ($data['redirect_uri'] ?? ''),
+                'access_token' => (string) ($data['access_token'] ?? ''),
+            ]
+        );
+        $user = $this->resolveOrCreateUserByIdentity($identity);
+        return $this->loginResponse($user, $anonymousToken, $device, $identity['provider']->value);
+    }
+
+    /** @return array{items:array<int,array<string,mixed>>} */
+    public function identities(PlayerContext $context): array
+    {
+        $user = $this->user($context);
+        return ['items' => PlayerFormat::identities($this->repository->identities((int) $user->id))];
+    }
+
+    /**
+     * Explicitly bind a mini-program identity to the currently signed-in user.
+     * Does not auto-merge accounts that already exist under other login methods.
+     *
+     * @param array<string,mixed> $data
+     * @return array{items:array<int,array<string,mixed>>}
+     */
+    public function bindMiniProgramIdentity(PlayerContext $context, array $data): array
+    {
+        $user = $this->activeUser($context);
+        $platform = trim((string) ($data['platform'] ?? ''));
+        if ($platform === '') {
+            ErrorCode::AUTH_MINI_PROGRAM_PLATFORM_INVALID->throw();
         }
-        return $this->loginResponse($user, $anonymousToken, $device, $provider);
+        $identity = $this->miniPrograms->exchange(
+            $platform,
+            (string) ($data['code'] ?? ''),
+            (string) ($data['anonymous_code'] ?? '')
+        );
+        $this->attachIdentity($user, $identity);
+        return $this->identities($context);
+    }
+
+    /**
+     * Explicitly bind WeChat Official Account OAuth identity to the signed-in user.
+     *
+     * @param array<string,mixed> $data
+     * @return array{items:array<int,array<string,mixed>>}
+     */
+    public function bindWechatOfficialIdentity(PlayerContext $context, array $data): array
+    {
+        $user = $this->activeUser($context);
+        $identity = $this->wechatOfficial->exchange((string) ($data['code'] ?? ''));
+        $this->attachIdentity($user, $identity);
+        return $this->identities($context);
+    }
+
+    /**
+     * Placeholder bind entry for future open-platform OAuth identities.
+     *
+     * @param array<string,mixed> $data
+     * @return array{items:array<int,array<string,mixed>>}
+     */
+    public function bindOpenPlatformIdentity(PlayerContext $context, array $data): array
+    {
+        $user = $this->activeUser($context);
+        $identity = $this->openPlatforms->exchange(
+            trim((string) ($data['platform'] ?? '')),
+            [
+                'code' => (string) ($data['code'] ?? ''),
+                'redirect_uri' => (string) ($data['redirect_uri'] ?? ''),
+                'access_token' => (string) ($data['access_token'] ?? ''),
+            ]
+        );
+        $this->attachIdentity($user, $identity);
+        return $this->identities($context);
+    }
+
+    /** @return array{items:array<int,array<string,mixed>>} */
+    public function unbindIdentity(PlayerContext $context, string $provider): array
+    {
+        $user = $this->user($context);
+        $provider = trim($provider);
+        if ($provider === '' || IdentityProvider::tryFrom($provider) === null) {
+            ErrorCode::AUTH_THIRD_PARTY_PLATFORM_INVALID->throw();
+        }
+        $identity = $this->repository->identityForProvider((int) $user->id, $provider);
+        if (!$identity instanceof UserIdentity) {
+            ErrorCode::AUTH_IDENTITY_NOT_FOUND->throw();
+        }
+        $remaining = (int) UserIdentity::query()->where('user_id', $user->id)->count() - 1;
+        $hasEmailLogin = trim((string) $user->email_normalized) !== '';
+        if (!$hasEmailLogin && $remaining <= 0) {
+            ErrorCode::AUTH_IDENTITY_LAST_LOGIN_METHOD->throw();
+        }
+        $identity->delete();
+        return $this->identities($context);
     }
 
     public function register(array $data, string $anonymousToken, array $device): array
@@ -284,6 +387,146 @@ final class PlayerAuthBusiness
         return array_merge($this->tokens->issue($user, $device[0], $device[1], $device[2]), ['user' => PlayerFormat::user($user), 'merged_games' => 0]);
     }
 
+    /**
+     * Resolve login target by provider+subject only (no auto-merge across login methods).
+     * Create the user+identity pair exactly once; concurrent unique-key races re-read the winner.
+     *
+     * @param array{provider:IdentityProvider,subject:string,union_subject:?string,metadata:array<string,mixed>} $identity
+     */
+    private function resolveOrCreateUserByIdentity(array $identity): User
+    {
+        $provider = $identity['provider']->value;
+        $subject = $identity['subject'];
+
+        $user = $this->repository->byIdentity($provider, $subject);
+        if ($user instanceof User) {
+            $this->refreshIdentityRow($provider, $subject, $identity);
+            return $user;
+        }
+
+        try {
+            return Db::transaction(function () use ($identity, $provider, $subject): User {
+                $existing = $this->repository->byIdentity($provider, $subject);
+                if ($existing instanceof User) {
+                    $this->refreshIdentityRow($provider, $subject, $identity);
+                    return $existing;
+                }
+                $publicId = PublicId::make();
+                $username = $this->availablePlatformUsername($identity['provider']);
+                $avatar = $this->avatars->createDefault($provider.':'.$subject, $publicId);
+                $created = new User();
+                $created->fill([
+                    'public_id' => $publicId,
+                    'username' => $username,
+                    'username_normalized' => mb_strtolower($username),
+                    'email' => null,
+                    'email_normalized' => null,
+                    'avatar_url' => $avatar['url'],
+                    'avatar_object_key' => $avatar['object_key'],
+                    'password_hash' => '',
+                    'status' => 'active',
+                    'email_verified_at' => null,
+                    'last_login_at' => date('Y-m-d H:i:s'),
+                ]);
+                $created->save();
+                $this->storeIdentity((int) $created->id, $identity);
+                return $created;
+            });
+        } catch (Throwable $exception) {
+            $winner = $this->repository->byIdentity($provider, $subject);
+            if ($winner instanceof User) {
+                $this->refreshIdentityRow($provider, $subject, $identity);
+                return $winner;
+            }
+            throw $exception;
+        }
+    }
+
+    /**
+     * @param array{provider:IdentityProvider,subject:string,union_subject:?string,metadata:array<string,mixed>} $identity
+     */
+    private function attachIdentity(User $user, array $identity): void
+    {
+        if ($user->status !== 'active') {
+            ErrorCode::AUTH_USER_DISABLED->throw();
+        }
+        $provider = $identity['provider']->value;
+        $subject = $identity['subject'];
+        $existing = $this->repository->identity($provider, $subject);
+        if ($existing instanceof UserIdentity) {
+            if ((int) $existing->user_id === (int) $user->id) {
+                $this->refreshIdentityRow($provider, $subject, $identity);
+                return;
+            }
+            ErrorCode::AUTH_IDENTITY_BOUND->throw();
+        }
+
+        try {
+            Db::transaction(function () use ($user, $identity, $provider, $subject): void {
+                $existing = $this->repository->identity($provider, $subject);
+                if ($existing instanceof UserIdentity) {
+                    if ((int) $existing->user_id !== (int) $user->id) {
+                        ErrorCode::AUTH_IDENTITY_BOUND->throw();
+                    }
+                    $this->refreshIdentityRow($provider, $subject, $identity);
+                    return;
+                }
+                $this->storeIdentity((int) $user->id, $identity);
+            });
+        } catch (BaseException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            $existing = $this->repository->identity($provider, $subject);
+            if ($existing instanceof UserIdentity && (int) $existing->user_id === (int) $user->id) {
+                return;
+            }
+            if ($existing instanceof UserIdentity) {
+                ErrorCode::AUTH_IDENTITY_BOUND->throw(previous: $exception);
+            }
+            throw $exception;
+        }
+    }
+
+    /**
+     * @param array{provider:IdentityProvider,subject:string,union_subject:?string,metadata:array<string,mixed>} $identity
+     */
+    private function storeIdentity(int $userId, array $identity): void
+    {
+        $userIdentity = new UserIdentity();
+        $userIdentity->fill([
+            'user_id' => $userId,
+            'provider' => $identity['provider']->value,
+            'provider_subject' => $identity['subject'],
+            'union_subject' => $identity['union_subject'],
+            'metadata' => $identity['metadata'] ?? [],
+        ]);
+        $userIdentity->save();
+    }
+
+    /**
+     * @param array{provider:IdentityProvider,subject:string,union_subject:?string,metadata:array<string,mixed>} $identity
+     */
+    private function refreshIdentityRow(string $provider, string $subject, array $identity): void
+    {
+        $row = $this->repository->identity($provider, $subject);
+        if (!$row instanceof UserIdentity) {
+            return;
+        }
+        $updates = [];
+        $unionSubject = $identity['union_subject'] ?? null;
+        if ($unionSubject !== null && $unionSubject !== '' && (string) ($row->union_subject ?? '') === '') {
+            $updates['union_subject'] = $unionSubject;
+        }
+        $metadata = is_array($row->metadata) ? $row->metadata : [];
+        $incoming = is_array($identity['metadata'] ?? null) ? $identity['metadata'] : [];
+        if ($incoming !== []) {
+            $updates['metadata'] = array_merge($metadata, $incoming);
+        }
+        if ($updates !== []) {
+            $row->update($updates);
+        }
+    }
+
     private function loginResponse(User $user, string $anonymousToken, array $device, string $method): array
     {
         if ($user->status !== 'active') {
@@ -292,7 +535,7 @@ final class PlayerAuthBusiness
         } $merged = 0;
         if ($anonymousToken !== '') {
             try {
-                $session = (new AnonymousSessionBusiness())->authenticate($anonymousToken);
+                $session = (new \App\Auth\Business\AnonymousSessionBusiness())->authenticate($anonymousToken);
             } catch (Throwable) {
                 $session = null;
             }
@@ -317,6 +560,16 @@ final class PlayerAuthBusiness
             ErrorCode::AUTH_TOKEN_INVALID->throw();
         } return $user;
     }
+
+    private function activeUser(PlayerContext $context): User
+    {
+        $user = $this->user($context);
+        if ($user->status !== 'active') {
+            ErrorCode::AUTH_USER_DISABLED->throw();
+        }
+        return $user;
+    }
+
     private function validateProfile(string $u, string $e, string $p): void
     {
         $this->validateUsername($u);
@@ -351,9 +604,9 @@ final class PlayerAuthBusiness
         return $candidate;
     }
 
-    private function availablePlatformUsername(string $provider): string
+    private function availablePlatformUsername(IdentityProvider $provider): string
     {
-        $prefix = $provider === 'WECHAT_MINI_PROGRAM' ? 'wx_player' : 'dy_player';
+        $prefix = $provider->usernamePrefix();
         do {
             $candidate = $prefix.'_'.substr(bin2hex(random_bytes(4)), 0, 6);
         } while (User::query()->where('username_normalized', $candidate)->exists());

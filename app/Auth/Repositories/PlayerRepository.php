@@ -10,6 +10,7 @@ use App\Auth\Models\RefreshSession;
 use App\Auth\Models\User;
 use App\Auth\Models\UserIdentity;
 use App\Game\Models\Game;
+use Illuminate\Database\Eloquent\Collection;
 
 final class PlayerRepository
 {
@@ -21,12 +22,30 @@ final class PlayerRepository
 
     public function byIdentity(string $provider, string $subject): ?User
     {
-        $identity = UserIdentity::query()->where('provider', $provider)->where('provider_subject', $subject)->first();
+        $identity = $this->identity($provider, $subject);
         if (!$identity instanceof UserIdentity) {
             return null;
         }
         $user = User::find((int) $identity->user_id);
         return $user instanceof User ? $user : null;
+    }
+
+    public function identity(string $provider, string $subject): ?UserIdentity
+    {
+        $identity = UserIdentity::query()->where('provider', $provider)->where('provider_subject', $subject)->first();
+        return $identity instanceof UserIdentity ? $identity : null;
+    }
+
+    /** @return Collection<int, UserIdentity> */
+    public function identities(int $userId): Collection
+    {
+        return UserIdentity::query()->where('user_id', $userId)->orderBy('provider')->orderBy('id')->get();
+    }
+
+    public function identityForProvider(int $userId, string $provider): ?UserIdentity
+    {
+        $identity = UserIdentity::query()->where('user_id', $userId)->where('provider', $provider)->orderByDesc('id')->first();
+        return $identity instanceof UserIdentity ? $identity : null;
     }
 
     public function mergeAnonymous(User $user, AnonymousSession $session): int

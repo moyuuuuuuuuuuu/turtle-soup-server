@@ -27,9 +27,9 @@ final class MiniProgramLoginService
             ErrorCode::PARAM_MISSING->throw('缺少小程序登录凭证');
         }
 
-        return match ($platform) {
-            'wechat' => $this->wechat($code),
-            'douyin' => $this->douyin($code, trim($anonymousCode)),
+        return match (mb_strtolower(trim($platform))) {
+            'wechat', 'weixin', 'wx' => $this->wechat($code),
+            'douyin', 'dy', 'toutiao' => $this->douyin($code, trim($anonymousCode)),
             default => ErrorCode::AUTH_MINI_PROGRAM_PLATFORM_INVALID->throw(),
         };
     }
