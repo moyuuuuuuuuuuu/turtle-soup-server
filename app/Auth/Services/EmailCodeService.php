@@ -6,6 +6,7 @@ namespace App\Auth\Services;
 
 use App\Auth\Models\EmailCode;
 use App\Common\Enums\ErrorCode;
+use support\Db;
 use Webman\RedisQueue\Client;
 
 final class EmailCodeService
@@ -45,15 +46,22 @@ final class EmailCodeService
     {
         $this->assertConfigured();
         $email = self::normalizeEmail($email);
-        $record = EmailCode::query()->where('email_normalized', $email)->where('purpose', $purpose)->whereNull('consumed_at')->orderByDesc('id')->first();
-        if (!$record instanceof EmailCode || strtotime((string) $record->expires_at) <= time()) {
-            ErrorCode::AUTH_EMAIL_CODE_EXPIRED->throw();
+        $error = Db::transaction(function () use ($email, $purpose, $code): ?ErrorCode {
+            $record = EmailCode::query()->where('email_normalized', $email)->where('purpose', $purpose)->whereNull('consumed_at')->orderByDesc('id')->lockForUpdate()->first();
+            if (!$record instanceof EmailCode || strtotime((string) $record->expires_at) <= time()) {
+                return ErrorCode::AUTH_EMAIL_CODE_EXPIRED;
+            }
+            if ((int) $record->attempts >= 5 || !hash_equals((string) $record->code_hash, $this->hashCode($email, $purpose, $code))) {
+                $record->increment('attempts');
+                return ErrorCode::AUTH_EMAIL_CODE_INVALID;
+            }
+            $record->update(['consumed_at' => date('Y-m-d H:i:s')]);
+            return null;
+        });
+        // Throw after committing so a failed attempt cannot roll back its counter.
+        if ($error instanceof ErrorCode) {
+            $error->throw();
         }
-        if ((int) $record->attempts >= 5 || !hash_equals((string) $record->code_hash, $this->hashCode($email, $purpose, $code))) {
-            $record->increment('attempts');
-            ErrorCode::AUTH_EMAIL_CODE_INVALID->throw();
-        }
-        $record->update(['consumed_at' => date('Y-m-d H:i:s')]);
     }
 
     public function notify(string $email, string $subject, string $body): void

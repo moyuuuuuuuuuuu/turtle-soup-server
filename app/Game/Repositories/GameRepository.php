@@ -19,11 +19,11 @@ final class GameRepository
         $q = Game::query()->where('public_id', $publicId);
         if ($context->isUser()) {
             $q->where(static function ($query) use ($context): void {
-                $query->where('user_id', $context->userId)
+                $query->where(static fn ($single) => $single->whereNull('room_id')->where('user_id', $context->userId))
                     ->orWhereHas('room.members', static fn ($members) => $members->where('user_id', $context->userId)->where('status', 'active'));
             });
         } else {
-            $q->whereNull('room_id')->where('anonymous_session_id', $context->anonymousSessionId);
+            $q->whereNull('room_id')->whereNull('user_id')->where('anonymous_session_id', $context->anonymousSessionId);
         }
         if ($lock) {
             $q->lockForUpdate();

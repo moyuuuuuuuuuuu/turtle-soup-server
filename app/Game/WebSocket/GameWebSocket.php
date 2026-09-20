@@ -9,7 +9,9 @@ use App\Auth\Models\User;
 use App\Auth\Services\PlayerPrincipalService;
 use App\Common\Enums\ErrorCode;
 use App\Game\Business\GameBusiness;
+use App\Game\Formats\WebSocketErrorFormat;
 use App\Room\Business\RoomBusiness;
+use App\Room\Repositories\RoomRepository;
 use Throwable;
 use Workerman\Connection\TcpConnection;
 use Workerman\Timer;
@@ -83,6 +85,9 @@ final class GameWebSocket
             }
             if ($event === 'v1.auth') {
                 $context = (new PlayerPrincipalService())->authenticate((string) ($payload['token'] ?? ''));
+                foreach (array_values(self::$connectionRooms[$connection->id] ?? []) as $roomId) {
+                    $this->detach($connection, $roomId);
+                }
                 self::$connectionContexts[$connection->id] = $context;
                 $this->send($connection, 'v1.authenticated', $requestId, ['identity' => $context->isUser() ? 'user' : 'anonymous']);
 
@@ -110,10 +115,7 @@ final class GameWebSocket
             }
             $this->handleGame($connection, $context, $event, $requestId, $payload);
         } catch (Throwable $exception) {
-            $this->send($connection, 'v1.game.error', $requestId, [
-                'code' => $exception->getMessage() ?: 'system.error',
-                'retryable' => str_starts_with($exception->getMessage(), 'ai.'),
-            ]);
+            $this->send($connection, 'v1.game.error', $requestId, WebSocketErrorFormat::format($exception));
         }
     }
 
@@ -353,6 +355,19 @@ final class GameWebSocket
     private function broadcast(string $roomId, string $event, string $requestId, array $data, ?int $excludeConnectionId = null): void
     {
         foreach (self::$roomConnections[$roomId] ?? [] as $connection) {
+            try {
+                $context = $this->context($connection);
+                $repository = new RoomRepository();
+                $room = $repository->find($roomId);
+                if (!$context->isUser() || $room === null || $room->status === 'closed'
+                    || $repository->member($room, (int) $context->userId) === null) {
+                    $this->detach($connection, $roomId);
+                    continue;
+                }
+            } catch (Throwable) {
+                $this->detach($connection, $roomId);
+                continue;
+            }
             if ($excludeConnectionId !== null && $connection->id === $excludeConnectionId) {
                 continue;
             }

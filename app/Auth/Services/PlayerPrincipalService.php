@@ -6,6 +6,7 @@ namespace App\Auth\Services;
 
 use App\Auth\Business\AnonymousSessionBusiness;
 use App\Auth\Entities\PlayerContext;
+use App\Auth\Models\AnonymousSession;
 use App\Auth\Models\RefreshSession;
 use App\Auth\Models\User;
 use App\Common\Enums\ErrorCode;
@@ -24,6 +25,11 @@ final class PlayerPrincipalService
     public function validate(PlayerContext $context): void
     {
         if (!$context->isUser()) {
+            $session = $context->anonymousSessionId === null ? null : AnonymousSession::find($context->anonymousSessionId);
+            if (!$session instanceof AnonymousSession || $session->getAttribute('revoked_at') || $session->getAttribute('user_id')
+                || strtotime((string) $session->getAttribute('expires_at')) <= time()) {
+                ErrorCode::AUTH_ANONYMOUS_INVALID->throw();
+            }
             return;
         }
         if (($context->accessExpiresAt ?? 0) <= time()) {

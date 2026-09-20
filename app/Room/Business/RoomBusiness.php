@@ -137,6 +137,8 @@ final class RoomBusiness
                     ['game_id' => (int) $room->game_id, 'user_id' => $userId],
                     ['status' => 'playing', 'joined_at' => $now],
                 );
+                GamePlayer::query()->where('game_id', $room->game_id)->where('user_id', $userId)
+                    ->where('status', 'left')->update(['status' => 'playing']);
             }
 
             return RoomFormat::snapshot($this->repository->hydrated($room), $userId);
@@ -530,7 +532,9 @@ final class RoomBusiness
         ]);
         unset(self::$mutedMembers[(int) $room->id][$userId]);
         if ($room->game_id) {
-            GamePlayer::query()->where('game_id', $room->game_id)->where('user_id', $userId)->delete();
+            // Participation is permanent history; RoomMember controls current access.
+            GamePlayer::query()->where('game_id', $room->game_id)->where('user_id', $userId)
+                ->where('status', 'playing')->update(['status' => 'left']);
         }
         if ((int) $room->owner_user_id !== $userId) {
             return;
