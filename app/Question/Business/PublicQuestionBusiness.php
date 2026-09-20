@@ -41,7 +41,8 @@ final class PublicQuestionBusiness
     /** @param array<string, mixed> $filters @return array<string, mixed> */
     public function random(array $filters): array
     {
-        $question = $this->query($filters)->inRandomOrder()->first();
+        // Remove list ordering so publication time cannot take precedence over randomness.
+        $question = $this->query($filters)->reorder()->inRandomOrder()->first();
         if (!$question instanceof Question) {
             ErrorCode::QUESTION_NOT_FOUND->throw();
         }
