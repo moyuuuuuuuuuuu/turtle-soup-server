@@ -9,12 +9,12 @@
 | --- | --- | --- |
 | POST | `/anonymous/session` | 按设备标识签发匿名令牌 |
 | POST | `/anonymous/session/renew` | 续期当前匿名令牌 |
-| GET | `/questions` | 已发布且公开的题目列表 |
+| GET | `/questions` | 已发布且公开的题目列表。Query：`keyword`（标题/汤面/标签）、`difficulty`、`tag_id`、`page`、`page_size`、`sort`（default/latest/popular/difficulty_asc/difficulty_desc） |
 | GET | `/questions/read` | 公开题目详情，不含汤底与推理点 |
 | GET | `/questions/random` | 按难度、标签和语言随机选题 |
 | POST | `/games` | 创建题目快照并开局 |
 | GET | `/games/read` | 当前权威快照 |
-| GET | `/games/history` | 匿名设备历史 |
+| GET | `/games/history` | 历史列表 + 统计。Query：`status`（all/created/playing/solved/finished/abandoned）、`continue_only`、`page`、`page_size`。返回 `{items, stats, pagination}`；items 含 surface/tags/duration，不含汤底 |
 | POST | `/games/ask` | HTTP 兼容提问入口 |
 | POST | `/games/hint` | 使用固定提示 |
 | POST | `/games/guess` | 提交唯一最终猜测 |

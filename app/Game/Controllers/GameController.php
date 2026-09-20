@@ -32,7 +32,15 @@ final class GameController extends BaseController
     }
     public function history(Request $request): Response
     {
-        return $this->success((new GameBusiness())->history($this->context($request)), $this->requestId($request));
+        return $this->success(
+            (new GameBusiness())->history($this->context($request), [
+                'status' => (string) $request->get('status', ''),
+                'page' => (int) $request->get('page', 1),
+                'page_size' => (int) $request->get('page_size', 20),
+                'continue_only' => filter_var($request->get('continue_only', false), FILTER_VALIDATE_BOOL),
+            ]),
+            $this->requestId($request)
+        );
     }
     public function ask(Request $request): Response
     {

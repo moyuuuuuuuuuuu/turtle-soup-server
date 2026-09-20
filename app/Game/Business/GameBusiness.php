@@ -93,34 +93,81 @@ final class GameBusiness
         return $this->create($context, (string) $question->public_id, (string) $game->getAttribute('content_locale'), false);
     }
 
-    public function history(PlayerContext $context): array
+    /**
+     * @param array{status?: string, page?: int, page_size?: int, continue_only?: bool} $query
+     * @return array{items: array<int, array<string, mixed>>, stats: array<string, int>, pagination: array{page: int, page_size: int, total: int, total_pages: int}}
+     */
+    public function history(PlayerContext $context, array $query = []): array
     {
-        $query = Game::query();
+        $page = max(1, (int) ($query['page'] ?? 1));
+        $pageSize = min(50, max(1, (int) ($query['page_size'] ?? 20)));
+        $status = trim((string) ($query['status'] ?? ''));
+        $continueOnly = filter_var($query['continue_only'] ?? false, FILTER_VALIDATE_BOOL);
+
+        $baseQuery = Game::query()->with(['question', 'guess']);
         if ($context->isUser()) {
-            $query->where(static function ($games) use ($context): void {
+            $baseQuery->where(static function ($games) use ($context): void {
                 $games
                     ->where('user_id', $context->userId)
                     ->orWhereHas('players', static fn ($players) => $players->where('user_id', $context->userId));
             });
         } else {
-            $query->whereNull('room_id')->where('anonymous_session_id', $context->anonymousSessionId);
+            $baseQuery->whereNull('room_id')->where('anonymous_session_id', $context->anonymousSessionId);
         }
+
+        $statsQuery = clone $baseQuery;
+        $statuses = $statsQuery->pluck('status')->map(static fn ($value): string => (string) $value)->all();
+        $stats = [
+            'played' => count($statuses),
+            'solved' => count(array_filter($statuses, static fn ($value): bool => $value === 'solved')),
+            'unfinished' => count(array_filter($statuses, static fn ($value): bool => in_array($value, ['created', 'playing'], true))),
+            'total_questions' => 0,
+            'total_duration_seconds' => 0,
+        ];
+        /** @var Collection<int, Game> $statGames */
+        $statGames = $statsQuery->get(['id', 'status', 'question_count', 'started_at', 'finished_at', 'create_time', 'update_time']);
+        foreach ($statGames as $statGame) {
+            $stats['total_questions'] += (int) $statGame->question_count;
+            $item = GameFormat::historyItem($statGame);
+            $stats['total_duration_seconds'] += (int) $item['duration_seconds'];
+        }
+
+        $listQuery = Game::query()->with(['question', 'guess']);
+        if ($context->isUser()) {
+            $listQuery->where(static function ($games) use ($context): void {
+                $games
+                    ->where('user_id', $context->userId)
+                    ->orWhereHas('players', static fn ($players) => $players->where('user_id', $context->userId));
+            });
+        } else {
+            $listQuery->whereNull('room_id')->where('anonymous_session_id', $context->anonymousSessionId);
+        }
+
+        if ($continueOnly) {
+            $listQuery->whereIn('status', ['created', 'playing']);
+        } elseif ($status !== '' && $status !== 'all') {
+            $listQuery->where('status', $status);
+        }
+
+        $total = (clone $listQuery)->count();
         /** @var Collection<int, Game> $games */
-        $games = $query->orderByDesc('id')->get();
+        $games = $listQuery->orderByDesc('id')->forPage($page, $pageSize)->get();
 
-        $history = [];
+        $items = [];
         foreach ($games as $game) {
-            $history[] = [
-                'id' => (string) $game->public_id,
-                'status' => (string) $game->status,
-                'title' => (string) (((array) $game->question_snapshot)['title'] ?? ''),
-                'difficulty' => (int) $game->difficulty,
-                'question_count' => (int) $game->question_count,
-                'create_time' => (string) $game->create_time,
-            ];
+            $items[] = GameFormat::historyItem($game);
         }
 
-        return $history;
+        return [
+            'items' => $items,
+            'stats' => $stats,
+            'pagination' => [
+                'page' => $page,
+                'page_size' => $pageSize,
+                'total' => $total,
+                'total_pages' => (int) ceil($total / $pageSize),
+            ],
+        ];
     }
     public function ask(PlayerContext $context, string $id, string $requestId, string $question): array
     {

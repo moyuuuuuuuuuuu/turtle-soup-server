@@ -16,7 +16,15 @@ final class PublicQuestionBusiness
         $query = $this->query($filters);
         $result = $query->paginate($size, ['*'], 'page', $page);
 
-        return ['items' => array_map([$this, 'format'], $result->items()), 'pagination' => ['page' => $page, 'page_size' => $size, 'total' => $result->total()]];
+        return [
+            'items' => array_map([$this, 'format'], $result->items()),
+            'pagination' => [
+                'page' => $page,
+                'page_size' => $size,
+                'total' => $result->total(),
+                'total_pages' => (int) ceil($result->total() / $size),
+            ],
+        ];
     }
 
     /** @return array<string, mixed> */
@@ -57,7 +65,12 @@ final class PublicQuestionBusiness
         }
         if (($filters['keyword'] ?? '') !== '') {
             $keyword = '%' . $filters['keyword'] . '%';
-            $query->whereHas('translations', fn ($item) => $item->where('language', (string) ($filters['language'] ?? 'zh-CN'))->where(fn ($text) => $text->whereLike('title', $keyword)->orWhereLike('surface', $keyword)));
+            $language = (string) ($filters['language'] ?? 'zh-CN');
+            $query->where(static function (Builder $builder) use ($keyword, $language): void {
+                $builder
+                    ->whereHas('translations', fn ($item) => $item->where('language', $language)->where(fn ($text) => $text->whereLike('title', $keyword)->orWhereLike('surface', $keyword)))
+                    ->orWhereHas('tags', fn ($tags) => $tags->whereLike('name', $keyword));
+            });
         }
 
         if (filter_var($filters['featured'] ?? false, FILTER_VALIDATE_BOOL)) {
@@ -68,7 +81,13 @@ final class PublicQuestionBusiness
                 ->orderBy('featured_sort');
         }
 
-        return $query->orderByDesc('published_at');
+        return match ((string) ($filters['sort'] ?? '')) {
+            'popular' => $query->orderByDesc('games_count')->orderByDesc('published_at'),
+            'difficulty_asc' => $query->orderBy('difficulty')->orderByDesc('published_at'),
+            'difficulty_desc' => $query->orderByDesc('difficulty')->orderByDesc('published_at'),
+            'latest' => $query->orderByDesc('published_at'),
+            default => $query->orderByDesc('published_at'),
+        };
     }
 
     /** @return array<string, mixed> */
