@@ -57,7 +57,10 @@ final class GameFormat
         ];
     }
 
-    /** 历史列表项：不含汤底与推理点，避免答案泄漏 */
+    /**
+     * 历史列表项：不含汤底与推理点，避免答案泄漏
+     * @return array<string, mixed>
+     */
     public static function historyItem(Game $game): array
     {
         $snapshot = (array) $game->question_snapshot;

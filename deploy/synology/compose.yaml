@@ -44,7 +44,7 @@ services:
     image: turtle-soup/server:local
     restart: unless-stopped
     env_file: production.env
-    user: "1026:100"
+    user: "${SERVER_UID:-1026}:${SERVER_GID:-100}"
     depends_on:
       mysql:
         condition: service_healthy

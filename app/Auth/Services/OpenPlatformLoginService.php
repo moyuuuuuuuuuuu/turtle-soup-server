@@ -13,15 +13,6 @@ use App\Common\Enums\ErrorCode;
  */
 final class OpenPlatformLoginService
 {
-    /** @var null|callable(string,string,array<string,string>):array<string,mixed> */
-    private $requester;
-
-    /** @param null|callable(string,string,array<string,string>):array<string,mixed> $requester */
-    public function __construct(?callable $requester = null)
-    {
-        $this->requester = $requester;
-    }
-
     /**
      * @param array{code?:string,redirect_uri?:string,access_token?:string} $payload
      * @return array{provider:IdentityProvider,subject:string,union_subject:?string,metadata:array<string,mixed>}

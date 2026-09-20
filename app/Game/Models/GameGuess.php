@@ -6,6 +6,11 @@ namespace App\Game\Models;
 
 use App\Common\Models\PersistenceModel;
 
+/**
+ * @property string $content
+ * @property bool $is_solved
+ * @property string|null $summary
+ */
 final class GameGuess extends PersistenceModel
 {
     protected $table = 'turtle_game_guesses';

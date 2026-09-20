@@ -1,0 +1,8 @@
+# Keep project PHP checks consistent on Windows and Linux.
+/app/Common/**/*.php text eol=lf
+/app/Health/**/*.php text eol=lf
+/app/Question/**/*.php text eol=lf
+/app/Ai/**/*.php text eol=lf
+/app/Auth/**/*.php text eol=lf
+/app/Game/**/*.php text eol=lf
+/tests/**/*.php text eol=lf

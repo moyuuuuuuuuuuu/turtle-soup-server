@@ -7,12 +7,18 @@ use App\Common\Support\ProductionConfiguration;
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 $path = $argv[1] ?? dirname(__DIR__) . '/.env';
-if (!is_readable($path)) {
-    fwrite(STDERR, "Production environment file is not readable: {$path}\n");
-    exit(2);
+if ($path === '--environment') {
+    // Compose injects env_file into the process; no .env is baked into the image.
+    $values = getenv();
+} elseif ($path === '--stdin') {
+    $values = parse_ini_string((string) file_get_contents('php://stdin'), false, INI_SCANNER_RAW);
+} else {
+    if (!is_readable($path)) {
+        fwrite(STDERR, "Production environment file is not readable: {$path}\n");
+        exit(2);
+    }
+    $values = parse_ini_file($path, false, INI_SCANNER_RAW);
 }
-
-$values = parse_ini_file($path, false, INI_SCANNER_RAW);
 if (!is_array($values)) {
     fwrite(STDERR, "Production environment file cannot be parsed: {$path}\n");
     exit(2);

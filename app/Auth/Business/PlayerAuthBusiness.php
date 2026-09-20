@@ -68,7 +68,10 @@ final class PlayerAuthBusiness
         return $this->loginResponse($user, $anonymousToken, $device, $identity['provider']->value);
     }
 
-    /** @return array{authorize_url:string,state:string,scope:string} */
+    /**
+     * @param array<string, mixed> $data
+     * @return array{authorize_url:string,state:string,scope:string}
+     */
     public function wechatOfficialAuthorizeUrl(array $data): array
     {
         return $this->wechatOfficial->authorizeUrl(

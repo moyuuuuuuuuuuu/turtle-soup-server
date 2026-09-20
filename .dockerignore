@@ -6,3 +6,6 @@
 runtime
 vendor
 *.log
+deploy/synology/production.env
+deploy/synology/data
+deploy/synology/sources

@@ -8,3 +8,6 @@
 /tests/.phpunit.result.cache
 /.codegraph/
 .DS_Store
+/deploy/synology/production.env
+/deploy/synology/data/
+/deploy/synology/sources/

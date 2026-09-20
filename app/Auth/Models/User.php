@@ -11,6 +11,7 @@ use App\Common\Models\PersistenceModel;
  * @property string $public_id
  * @property string $username
  * @property string $email
+ * @property null|string $email_normalized
  * @property string $password_hash
  * @property string $status
  * @property null|string $username_changed_at

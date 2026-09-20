@@ -44,7 +44,11 @@ final class PlayerRepository
 
     public function identityForProvider(int $userId, string $provider): ?UserIdentity
     {
-        $identity = UserIdentity::query()->where('user_id', $userId)->where('provider', $provider)->orderByDesc('id')->first();
+        /** @var \Illuminate\Database\Eloquent\Builder<UserIdentity> $query */
+        $query = UserIdentity::query();
+        $query->where('user_id', $userId)->where('provider', $provider);
+        $query->orderByDesc('id');
+        $identity = $query->first();
         return $identity instanceof UserIdentity ? $identity : null;
     }
 

@@ -16,6 +16,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $room_id
  * @property Room|null $room
  * @property Question|null $question
+ * @property string $status
+ * @property int $difficulty
+ * @property int $question_count
+ * @property array<string, mixed> $question_snapshot
+ * @property \Illuminate\Support\Carbon|null $started_at
+ * @property \Illuminate\Support\Carbon|null $finished_at
+ * @property \Illuminate\Support\Carbon|null $create_time
+ * @property GameGuess|null $guess
  */
 
 final class Game extends PersistenceModel

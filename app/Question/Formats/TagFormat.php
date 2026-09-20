@@ -9,7 +9,10 @@ use Illuminate\Database\Eloquent\Collection;
 
 final class TagFormat
 {
-    /** @param Collection<int, Tag> $tags @return array<int, array{id: int, name: string}> */
+    /**
+     * @param Collection<int, Tag> $tags
+     * @return array<int, array{id: int, name: string}>
+     */
     public static function publicList(Collection $tags): array
     {
         return $tags->map(static fn (Tag $tag): array => [
