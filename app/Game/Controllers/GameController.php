@@ -7,6 +7,7 @@ namespace App\Game\Controllers;
 use App\Auth\Entities\PlayerContext;
 use App\Auth\Services\PlayerPrincipalService;
 use App\Common\Controllers\BaseController;
+use App\Common\Support\ClientIp;
 use App\Game\Business\GameBusiness;
 use support\Request;
 use support\Response;
@@ -16,7 +17,9 @@ final class GameController extends BaseController
     private function context(Request $request): PlayerContext
     {
         $token = preg_replace('/^Bearer\s+/i', '', (string)$request->header('Authorization', '')) ?? '';
-        return (new PlayerPrincipalService())->authenticate($token);
+        return (new PlayerPrincipalService())->authenticate($token)->withSourceIp(
+            ClientIp::resolve($request->getRemoteIp(), (string) $request->header('x-forwarded-for', '')),
+        );
     }
     private function requestId(Request $request): string
     {

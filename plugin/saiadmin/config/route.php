@@ -12,6 +12,7 @@ Route::group('/core', function () {
 
     Route::get('/captcha', [plugin\saiadmin\app\controller\LoginController::class, 'captcha']);
     Route::post('/login', [plugin\saiadmin\app\controller\LoginController::class, 'login']);
+    Route::post('/logout', [plugin\saiadmin\app\controller\LoginController::class, 'logout']);
 
     Route::get('/system/user', [plugin\saiadmin\app\controller\SystemController::class, 'userInfo']);
     Route::get("/system/dictAll", [plugin\saiadmin\app\controller\SystemController::class, 'dictAll']);

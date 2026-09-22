@@ -51,7 +51,7 @@ class SystemUser
         $info = getCurrentInfo();
         $ip = $request->getRealIp();
         $module = $request->plugin;
-        $rule = trim($request->uri());
+        $rule = $request->path();
         $data['username'] = $info['username'];
         $data['method'] = $request->method();
         $data['router'] = $rule;
@@ -86,13 +86,7 @@ class SystemUser
      */
     protected function filterParams($params): string
     {
-        $blackList = ['password', 'oldPassword', 'newPassword', 'confirmPassword'];
-        foreach ($params as $key => $value) {
-            if (in_array($key, $blackList)) {
-                $params[$key] = '******';
-            }
-        }
-        return json_encode($params, JSON_UNESCAPED_UNICODE);
+        return json_encode(\App\Common\Support\AdminLogRedactor::redact($params), JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     /**

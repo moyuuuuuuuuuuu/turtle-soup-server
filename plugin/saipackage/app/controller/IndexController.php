@@ -8,7 +8,10 @@ use support\Request;
 use support\Response;
 use Throwable;
 use Workerman\Protocols\Http\ServerSentEvents;
+use App\Admin\Middleware\AdminTerminalMiddleware;
+use support\annotation\Middleware;
 
+#[Middleware(AdminTerminalMiddleware::class)]
 class IndexController extends OpenController
 {
     /**
@@ -21,15 +24,18 @@ class IndexController extends OpenController
     {
         // SSE 消息
         $connection = $request->connection;
-        $connection->send(new Response(200, [
+        $headers = [
             'Content-Type'                     => 'text/event-stream',
             'Cache-Control'                    => 'no-cache',
             'Connection'                       => 'keep-alive',
             'X-Accel-Buffering'                => 'no',
-            'Access-Control-Allow-Origin'      => '*',
-            'Access-Control-Allow-Credentials' => 'true',
-            'Access-Control-Expose-Headers'    => 'Content-Type',
-        ], "\r\n"));
+        ];
+        $origin = (string) $request->header('origin', '');
+        if ($origin !== '' && in_array($origin, (array) config('cors.allowed_origins', []), true)) {
+            $headers['Access-Control-Allow-Origin'] = $origin;
+            $headers['Vary'] = 'Origin';
+        }
+        $connection->send(new Response(200, $headers, "\r\n"));
 
         // 消息开始
         $connection->send(new ServerSentEvents([
@@ -37,7 +43,8 @@ class IndexController extends OpenController
         ]));
 
         // 生成器
-        $generator = (new Terminal())->exec();
+        // Authentication, session revocation and super-admin checks run before streaming.
+        $generator = (new Terminal())->exec(false);
         foreach ($generator as $chunk) {
             $connection->send(new ServerSentEvents([
                 'event' => 'message', 'data' => $chunk

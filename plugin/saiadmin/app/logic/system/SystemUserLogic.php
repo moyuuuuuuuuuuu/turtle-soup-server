@@ -15,7 +15,6 @@ use plugin\saiadmin\app\model\system\SystemUser;
 use plugin\saiadmin\exception\ApiException;
 use plugin\saiadmin\basic\eloquent\BaseLogic;
 use Webman\Event\Event;
-use Tinywan\Jwt\JwtToken;
 use Illuminate\Support\Arr;
 
 /**
@@ -235,7 +234,7 @@ class SystemUserLogic extends BaseLogic
         $adminInfo->save();
 
         $access_exp = config('plugin.saiadmin.saithink.access_exp', 3 * 3600);
-        $token = JwtToken::generateToken([
+        $token = (new \App\Admin\Services\AdminSessionService())->issue([
             'access_exp' => $access_exp,
             'id' => $adminInfo->id,
             'username' => $adminInfo->username,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Game;
 
+use App\Common\Services\RequestLimiter;
 use App\Game\WebSocket\GameWebSocket;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -11,6 +12,31 @@ use Workerman\Connection\TcpConnection;
 
 final class GameWebSocketTest extends TestCase
 {
+    public function testMessageQuotaRejectsAuthenticationBeforeDatabaseAccess(): void
+    {
+        $connection = $this->createMock(TcpConnection::class);
+        $connection->id = 105;
+        $connection->expects(self::once())->method('send')->willReturnCallback(static function (string $raw): void {
+            self::assertSame('request.too_frequent', json_decode($raw, true, 512, JSON_THROW_ON_ERROR)['data']['code']);
+            self::assertSame('blocked', json_decode($raw, true, 512, JSON_THROW_ON_ERROR)['request_id']);
+        });
+        $socket = new GameWebSocket(new RequestLimiter(static fn (): int => 181));
+        $socket->onConnect($connection);
+        $socket->onMessage($connection, json_encode(['event' => 'v1.auth', 'request_id' => 'blocked', 'data' => ['token' => 'invalid']], JSON_THROW_ON_ERROR));
+    }
+
+    public function testOversizedMessageIsRejectedBeforeDecoding(): void
+    {
+        $connection = $this->createMock(TcpConnection::class);
+        $connection->id = 106;
+        $connection->expects(self::once())->method('send')->willReturnCallback(static function (string $raw): void {
+            self::assertSame('request.param_error', json_decode($raw, true, 512, JSON_THROW_ON_ERROR)['data']['code']);
+        });
+        $socket = new GameWebSocket(new RequestLimiter(static fn (): int => 1));
+        $socket->onConnect($connection);
+        $socket->onMessage($connection, str_repeat('x', 16385));
+    }
+
     public function testContinueUsesAWebSocketNavigationEventForSingleAndMultiplayerGames(): void
     {
         $gameBusiness = file_get_contents(dirname(__DIR__, 2).'/app/Game/Business/GameBusiness.php');
@@ -41,7 +67,7 @@ final class GameWebSocketTest extends TestCase
     protected function tearDown(): void
     {
         $reflection = new ReflectionClass(GameWebSocket::class);
-        foreach (['roomConnections', 'connectionRooms'] as $propertyName) {
+        foreach (['roomConnections', 'connectionRooms', 'connectionContexts', 'connectionIps'] as $propertyName) {
             $property = $reflection->getProperty($propertyName);
             $property->setValue(null, []);
         }
@@ -58,7 +84,7 @@ final class GameWebSocketTest extends TestCase
                 $sent[] = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
             });
 
-        $socket = new GameWebSocket();
+        $socket = new GameWebSocket(new RequestLimiter(static fn (): int => 1));
         $socket->onConnect($connection);
         $socket->onMessage($connection, json_encode(['event' => 'v1.ping'], JSON_THROW_ON_ERROR));
 
@@ -78,7 +104,7 @@ final class GameWebSocketTest extends TestCase
                 $sent[] = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
             });
 
-        $socket = new GameWebSocket();
+        $socket = new GameWebSocket(new RequestLimiter(static fn (): int => 1));
         $socket->onConnect($connection);
         $socket->onMessage($connection, json_encode(['event' => 'v1.room.join'], JSON_THROW_ON_ERROR));
 
@@ -95,6 +121,7 @@ final class GameWebSocketTest extends TestCase
         $socket = new GameWebSocket();
         $socket->onConnect($connection);
         $socket->onClose($connection);
+        self::assertSame(32768, $connection->maxPackageSize);
 
         $reflection = new ReflectionClass(GameWebSocket::class);
         $property = $reflection->getProperty('connectionRooms');

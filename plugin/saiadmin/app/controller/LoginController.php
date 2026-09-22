@@ -23,6 +23,12 @@ class LoginController extends BaseController
      */
     protected array $noNeedLogin = ['captcha', 'login'];
 
+    public function logout(): Response
+    {
+        (new \App\Admin\Services\AdminSessionService())->logout();
+        return $this->success('退出登录成功');
+    }
+
     /**
      * 获取验证码
      */

@@ -6,14 +6,14 @@ return [
         /** 算法类型 HS256、HS384、HS512、RS256、RS384、RS512、ES256、ES384、ES512、PS256、PS384、PS512 */
         'algorithms' => 'HS256',
 
-        /** access令牌秘钥（安装时自动生成64位随机值） */
-        'access_secret_key' => 'caf0a6a2f42d51dcb0b8c6e3cc4981f82b07c9c2dd7b8fb49a84f7e0cdc29bb9',
+        /** Independent deployment secret; never commit a fallback key. */
+        'access_secret_key' => (string) env('ADMIN_JWT_ACCESS_SECRET', ''),
 
         /** access令牌过期时间，单位：秒。默认 2 小时 */
         'access_exp' => 7200,
 
-        /** refresh令牌秘钥（安装时自动生成64位随机值） */
-        'refresh_secret_key' => '2d6b1431cc2969c3d70b7dc4fc46d7cdad4b6b26ce36a7c735add53ea1636ff7',
+        /** Rotate both secrets with bin/rotate-admin-jwt-keys.php. */
+        'refresh_secret_key' => (string) env('ADMIN_JWT_REFRESH_SECRET', ''),
 
         /** refresh令牌过期时间，单位：秒。默认 7 天 */
         'refresh_exp' => 604800,

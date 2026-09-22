@@ -6,6 +6,7 @@ includes:
 parameters:
     level: 6
     paths:
+        - app/Admin
         - app/Common
         - app/Health
         - app/Question

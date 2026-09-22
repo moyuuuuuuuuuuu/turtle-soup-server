@@ -17,6 +17,16 @@ final class ProductionConfiguration
         }
 
         $violations = [];
+        if (($values['API_RATE_LIMIT_ENABLED'] ?? '') !== '' && !filter_var($values['API_RATE_LIMIT_ENABLED'], FILTER_VALIDATE_BOOL)) {
+            $violations[] = 'API_RATE_LIMIT_ENABLED must be true in production';
+        }
+        foreach (['GAME_GUEST_CALLS_PER_MINUTE', 'GAME_GUEST_CALLS_PER_DAY', 'GAME_USER_CALLS_PER_MINUTE',
+            'GAME_USER_CALLS_PER_DAY', 'GAME_IP_CALLS_PER_MINUTE', 'GAME_IP_CALLS_PER_DAY',
+            'GAME_GLOBAL_CALLS_PER_DAY', 'GAME_IP_CONCURRENCY', 'GAME_GLOBAL_CONCURRENCY'] as $name) {
+            if (($values[$name] ?? '') !== '' && filter_var($values[$name], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) === false) {
+                $violations[] = $name . ' must be a positive integer';
+            }
+        }
         if (filter_var($values['APP_DEBUG'] ?? 'false', FILTER_VALIDATE_BOOL)) {
             $violations[] = 'APP_DEBUG must be false in production';
         }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 $finder = PhpCsFixer\Finder::create()
     ->in([
+        __DIR__ . '/app/Admin',
         __DIR__ . '/app/Common',
         __DIR__ . '/app/Health',
         __DIR__ . '/app/Question',

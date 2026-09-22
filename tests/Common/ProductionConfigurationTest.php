@@ -9,6 +9,17 @@ use PHPUnit\Framework\TestCase;
 
 final class ProductionConfigurationTest extends TestCase
 {
+    public function testProductionCannotDisableRateLimitsOrUseUnlimitedBudgets(): void
+    {
+        $violations = ProductionConfiguration::violations([
+            'APP_ENV' => 'production', 'API_RATE_LIMIT_ENABLED' => 'false',
+            'GAME_GLOBAL_CALLS_PER_DAY' => '0', 'GAME_IP_CONCURRENCY' => '-1',
+        ]);
+        self::assertContains('API_RATE_LIMIT_ENABLED must be true in production', $violations);
+        self::assertContains('GAME_GLOBAL_CALLS_PER_DAY must be a positive integer', $violations);
+        self::assertContains('GAME_IP_CONCURRENCY must be a positive integer', $violations);
+    }
+
     public function testLocalEnvironmentIsNotRejected(): void
     {
         self::assertSame([], ProductionConfiguration::violations(['APP_ENV' => 'local']));

@@ -276,7 +276,7 @@ class InstallController extends BaseController
      */
     public function storeUserInfo(Request $request): Response
     {
-        $token = $request->input('token');
+        $token = $request->post('token');
         if (empty($token)) {
             return $this->fail('未登录');
         }
@@ -297,7 +297,7 @@ class InstallController extends BaseController
      */
     public function storePurchasedApps(Request $request): Response
     {
-        $token = $request->input('token');
+        $token = $request->post('token');
         if (empty($token)) {
             return $this->fail('未登录');
         }
@@ -318,7 +318,7 @@ class InstallController extends BaseController
      */
     public function storeAppVersions(Request $request): Response
     {
-        $token = $request->input('token');
+        $token = $request->post('token');
         $appId = $request->input('app_id');
 
         if (empty($token)) {
@@ -341,7 +341,7 @@ class InstallController extends BaseController
      */
     public function storeDownloadApp(Request $request): Response
     {
-        $token = $request->input('token');
+        $token = $request->post('token');
         $versionId = $request->input('id');
 
         if (empty($token)) {

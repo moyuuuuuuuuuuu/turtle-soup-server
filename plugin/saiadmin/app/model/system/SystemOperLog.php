@@ -18,11 +18,11 @@ use plugin\saiadmin\basic\eloquent\BaseModel;
  * @property  $username 用户名
  * @property  $app 应用名称
  * @property  $method 请求方式
- * @property  $router 请求路由
+ * @property string $router 请求路由
  * @property  $service_name 业务名称
  * @property  $ip 请求IP地址
  * @property  $ip_location IP所属地
- * @property  $request_data 请求数据
+ * @property string $request_data 请求数据
  * @property  $remark 备注
  * @property  $created_by 创建者
  * @property  $updated_by 更新者
@@ -38,5 +38,23 @@ class SystemOperLog extends BaseModel
     protected $primaryKey = 'id';
 
     protected $table = 'sa_system_oper_log';
+
+    /** Redact legacy rows on read while deployment operators arrange historical cleanup. */
+    public function getRequestDataAttribute($value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+        $data = is_array($value) ? $value : json_decode((string) $value, true);
+        if (!is_array($data)) {
+            return '[REDACTED]';
+        }
+        return json_encode(\App\Common\Support\AdminLogRedactor::redact($data), JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    }
+
+    public function getRouterAttribute($value): string
+    {
+        return explode('?', (string) $value, 2)[0];
+    }
 
 }

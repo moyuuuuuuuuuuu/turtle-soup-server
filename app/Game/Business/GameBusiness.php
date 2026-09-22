@@ -13,6 +13,7 @@ use App\Game\Models\Game;
 use App\Game\Models\GamePlayer;
 use App\Game\Repositories\GameRepository;
 use App\Game\Services\GameJudgeFactory;
+use App\Game\Services\GameUsageGuard;
 use App\Game\Support\QuestionLimitResolver;
 use App\Question\Models\Question;
 use Illuminate\Database\Eloquent\Collection;
@@ -23,11 +24,13 @@ final class GameBusiness
 {
     private readonly GameRepository $repository;
     private readonly GameJudgeInterface $judge;
+    private readonly GameUsageGuard $usage;
 
-    public function __construct(?GameRepository $repository = null, ?GameJudgeInterface $judge = null)
+    public function __construct(?GameRepository $repository = null, ?GameJudgeInterface $judge = null, ?GameUsageGuard $usage = null)
     {
         $this->repository = $repository ?? new GameRepository();
         $this->judge = $judge ?? GameJudgeFactory::make();
+        $this->usage = $usage ?? new GameUsageGuard();
     }
     public function create(PlayerContext $context, string $questionPublicId, string $language, bool $riskConfirmed, ?int $roomId = null): array
     {
@@ -171,6 +174,23 @@ final class GameBusiness
     }
     public function ask(PlayerContext $context, string $id, string $requestId, string $question): array
     {
+        if (trim($question) === '' || mb_strlen($question) > 500 || trim($requestId) === '' || strlen($requestId) > 128) {
+            ErrorCode::PARAM_ERROR->throw();
+        }
+        $game = $this->required($context, $id);
+        if ($this->repository->duplicate($game, $requestId)) {
+            return GameFormat::snapshot($this->repository->hydrated($game));
+        }
+        $this->assertCanAsk($game);
+        return $this->usage->run(
+            $context,
+            $id,
+            fn (): array => $this->askGuarded($context, $id, $requestId, $question),
+        );
+    }
+    /** @return array<string, mixed> */
+    private function askGuarded(PlayerContext $context, string $id, string $requestId, string $question): array
+    {
         if (trim($question) === '' || mb_strlen($question) > 500) {
             ErrorCode::PARAM_ERROR->throw();
         }
@@ -220,6 +240,25 @@ final class GameBusiness
         });
     }
     public function guess(PlayerContext $context, string $id, string $requestId, string $guess): array
+    {
+        if (trim($guess) === '' || mb_strlen($guess) > 2000 || trim($requestId) === '' || strlen($requestId) > 128) {
+            ErrorCode::PARAM_ERROR->throw();
+        }
+        $game = $this->required($context, $id);
+        if ($this->repository->duplicateGuess($game, $requestId)) {
+            return GameFormat::snapshot($this->repository->hydrated($game));
+        }
+        if (!in_array($game->status, ['created','playing'], true) || $game->guess()->exists()) {
+            ErrorCode::GAME_STATUS_INVALID->throw();
+        }
+        return $this->usage->run(
+            $context,
+            $id,
+            fn (): array => $this->guessGuarded($context, $id, $requestId, $guess),
+        );
+    }
+    /** @return array<string, mixed> */
+    private function guessGuarded(PlayerContext $context, string $id, string $requestId, string $guess): array
     {
         if (trim($guess) === '' || mb_strlen($guess) > 2000) {
             ErrorCode::PARAM_ERROR->throw();

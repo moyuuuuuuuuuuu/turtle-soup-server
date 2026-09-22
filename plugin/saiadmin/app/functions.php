@@ -6,7 +6,6 @@
 // +----------------------------------------------------------------------
 use Webman\Route;
 use support\Response;
-use Tinywan\Jwt\JwtToken;
 use plugin\saiadmin\exception\ApiException;
 use plugin\saiadmin\app\cache\ConfigCache;
 use plugin\saiadmin\app\cache\DictCache;
@@ -21,7 +20,7 @@ if (!function_exists('getCurrentInfo')) {
             return false;
         }
         try {
-            $token = JwtToken::getExtend();
+            $token = (new \App\Admin\Services\AdminSessionService())->authenticate()['extend'];
         } catch (\Throwable $e) {
             return false;
         }

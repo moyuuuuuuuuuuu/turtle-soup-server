@@ -29,13 +29,14 @@ class Handler extends ExceptionHandler
         $logs = '';
         if ($request = \request()) {
             $user = getCurrentInfo();
-            $logs .= $request->method() . ' ' . $request->uri();
-            $logs .= PHP_EOL . '[request_param]: ' . json_encode($request->all());
+            $logs .= $request->method() . ' ' . $request->path();
+            $logs .= PHP_EOL . '[request_param]: ' . json_encode(\App\Common\Support\AdminLogRedactor::redact($request->all()));
             $logs .= PHP_EOL . '[timestamp]: ' . date('Y-m-d H:i:s');
             $logs .= PHP_EOL . '[client_ip]: ' . $request->getRealIp();
-            $logs .= PHP_EOL . '[action_user]: ' . var_export($user, true);
+            $logs .= PHP_EOL . '[action_user_id]: ' . ($user['id'] ?? 'unknown');
             $logs .= PHP_EOL . '[exception_handle]: ' . get_class($exception);
-            $logs .= PHP_EOL . '[exception_info]: ' . PHP_EOL . $exception;
+            // Exception messages and arguments can contain request credentials.
+            $logs .= PHP_EOL . '[exception_location]: ' . $exception->getFile() . ':' . $exception->getLine();
         }
         $this->logger->error($logs);
     }
@@ -46,21 +47,20 @@ class Handler extends ExceptionHandler
         $code = $exception->getCode();
         $json = [
             'code' => $code ? $code : 500,
-            'message' => $code !== 500 ? $exception->getMessage() : 'Server internal error',
+            'message' => 'Server internal error',
             'type' => 'failed'
         ];
         if ($debug) {
-            $json['request_url'] = $request->method() . ' ' . $request->uri();
+            $json['request_url'] = $request->method() . ' ' . $request->path();
             $json['timestamp'] = date('Y-m-d H:i:s');
             $json['client_ip'] = $request->getRealIp();
-            $json['request_param'] = $request->all();
+            $json['request_param'] = \App\Common\Support\AdminLogRedactor::redact($request->all());
             $json['exception_handle'] = get_class($exception);
             $json['exception_info'] = [
                 'code' => $exception->getCode(),
-                'message' => $exception->getMessage(),
                 'file' => $exception->getFile(),
                 'line' => $exception->getLine(),
-                'trace' => explode("\n", $exception->getTraceAsString())
+                'trace' => array_map(static fn (array $frame): array => array_intersect_key($frame, array_flip(['file', 'line', 'class', 'function'])), $exception->getTrace())
             ];
         }
         return new Response(200, ['Content-Type' => 'application/json;charset=utf-8'], json_encode($json));

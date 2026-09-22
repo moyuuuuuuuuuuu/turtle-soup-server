@@ -11,11 +11,17 @@ final readonly class PlayerContext
         public ?int $anonymousSessionId = null,
         public ?int $refreshSessionId = null,
         public ?int $accessExpiresAt = null,
+        public string $sourceIp = '',
     ) {
     }
 
     public function isUser(): bool
     {
         return $this->userId !== null;
+    }
+
+    public function withSourceIp(string $sourceIp): self
+    {
+        return new self($this->userId, $this->anonymousSessionId, $this->refreshSessionId, $this->accessExpiresAt, $sourceIp);
     }
 }

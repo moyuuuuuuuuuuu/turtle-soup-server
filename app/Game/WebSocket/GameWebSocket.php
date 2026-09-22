@@ -8,12 +8,15 @@ use App\Auth\Entities\PlayerContext;
 use App\Auth\Models\User;
 use App\Auth\Services\PlayerPrincipalService;
 use App\Common\Enums\ErrorCode;
+use App\Common\Services\RequestLimiter;
+use App\Common\Support\ClientIp;
 use App\Game\Business\GameBusiness;
 use App\Game\Formats\WebSocketErrorFormat;
 use App\Room\Business\RoomBusiness;
 use App\Room\Repositories\RoomRepository;
 use Throwable;
 use Workerman\Connection\TcpConnection;
+use Workerman\Protocols\Http\Request;
 use Workerman\Timer;
 
 final class GameWebSocket
@@ -24,10 +27,26 @@ final class GameWebSocket
     private static array $connectionRooms = [];
     /** @var array<int, PlayerContext> */
     private static array $connectionContexts = [];
+    /** @var array<int, string> */
+    private static array $connectionIps = [];
+
+    public function __construct(private readonly ?RequestLimiter $limiter = null)
+    {
+    }
+
+    public function onWebSocketConnect(TcpConnection $connection, Request $request): void
+    {
+        self::$connectionIps[$connection->id] = ClientIp::resolve(
+            $connection->getRemoteIp(),
+            (string) $request->header('x-forwarded-for', ''),
+        );
+    }
 
     public function onConnect(TcpConnection $connection): void
     {
+        $connection->maxPackageSize = 32768;
         self::$connectionRooms[$connection->id] = [];
+        self::$connectionIps[$connection->id] = ClientIp::resolve($connection->getRemoteIp());
     }
 
     public function onClose(TcpConnection $connection): void
@@ -42,6 +61,7 @@ final class GameWebSocket
         }
         unset(self::$connectionRooms[$connection->id]);
         unset(self::$connectionContexts[$connection->id]);
+        unset(self::$connectionIps[$connection->id]);
         if ($context?->isUser() && $rooms !== []) {
             Timer::add(45, function () use ($context, $rooms): void {
                 foreach ($rooms as $roomId) {
@@ -76,15 +96,21 @@ final class GameWebSocket
     {
         $requestId = '';
         try {
+            if (strlen($raw) > 16384) {
+                ErrorCode::PARAM_ERROR->throw();
+            }
             $message = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
             $event = (string) ($message['event'] ?? '');
             $requestId = (string) ($message['request_id'] ?? '');
             $payload = (array) ($message['data'] ?? []);
-            if ($requestId === '' && $event !== 'v1.ping') {
+            if (($requestId === '' && $event !== 'v1.ping') || strlen($requestId) > 128) {
                 throw new \InvalidArgumentException('request.param_missing');
             }
+            ($this->limiter ?? new RequestLimiter())->consume('websocket:messages', self::$connectionIps[$connection->id] ?? 'unknown', 180, 60);
             if ($event === 'v1.auth') {
-                $context = (new PlayerPrincipalService())->authenticate((string) ($payload['token'] ?? ''));
+                $context = (new PlayerPrincipalService())->authenticate((string) ($payload['token'] ?? ''))->withSourceIp(
+                    self::$connectionIps[$connection->id] ?? 'unknown',
+                );
                 foreach (array_values(self::$connectionRooms[$connection->id] ?? []) as $roomId) {
                     $this->detach($connection, $roomId);
                 }

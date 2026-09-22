@@ -28,6 +28,44 @@ use Workerman\Connection\TcpConnection;
 /** Exercises real Eloquent query building with mocked I/O; never opens a database. */
 final class SecurityRegressionTest extends TestCase
 {
+    public function testGameQuestionCannotCallJudgeWhenSharedQuotaDeniesAdmission(): void
+    {
+        $this->connection->method('select')->willReturnOnConsecutiveCalls(
+            [['id' => 1, 'status' => 'playing', 'question_count' => 0, 'question_limit' => 12]],
+            [],
+        );
+        $judge = $this->createMock(\App\Game\Contracts\GameJudgeInterface::class);
+        $judge->expects(self::never())->method('judgeQuestion');
+        $usage = new \App\Game\Services\GameUsageGuard(static fn (): int => 0);
+        $business = new \App\Game\Business\GameBusiness(judge: $judge, usage: $usage);
+        $this->expectException(BaseException::class);
+        $business->ask(new PlayerContext(anonymousSessionId: 1), 'game', 'request', '问题');
+    }
+
+    public function testUnauthorizedGameCannotReserveAnotherGamesLockOrGlobalBudget(): void
+    {
+        $this->connection->method('select')->willReturn([]);
+        $usage = new \App\Game\Services\GameUsageGuard(static fn (): int => self::fail('Authorization must precede quota reservation'));
+        $business = new \App\Game\Business\GameBusiness(usage: $usage);
+        $this->expectException(BaseException::class);
+        $business->ask(new PlayerContext(anonymousSessionId: 1), 'other-game', 'request', '问题');
+    }
+
+    public function testGameGuessCannotCallJudgeWhenSharedQuotaDeniesAdmission(): void
+    {
+        $this->connection->method('select')->willReturnOnConsecutiveCalls(
+            [['id' => 1, 'status' => 'playing']],
+            [],
+            [['exists' => 0]],
+        );
+        $judge = $this->createMock(\App\Game\Contracts\GameJudgeInterface::class);
+        $judge->expects(self::never())->method('judgeGuess');
+        $usage = new \App\Game\Services\GameUsageGuard(static fn (): int => 0);
+        $business = new \App\Game\Business\GameBusiness(judge: $judge, usage: $usage);
+        $this->expectException(BaseException::class);
+        $business->guess(new PlayerContext(anonymousSessionId: 1), 'game', 'request', '答案');
+    }
+
     private MySqlConnection&\PHPUnit\Framework\MockObject\MockObject $connection;
     private mixed $oldResolver;
     private mixed $oldCapsule;
@@ -218,7 +256,7 @@ final class SecurityRegressionTest extends TestCase
     {
         $this->connection->method('select')->willReturn([['id' => 8, 'expires_at' => date('Y-m-d H:i:s', time() + 600)]]);
         $this->connection->method('update')->willReturn(1);
-        $socket = new GameWebSocket();
+        $socket = new GameWebSocket(new \App\Common\Services\RequestLimiter(static fn (): int => 1));
         $connection = $this->createMock(TcpConnection::class);
         $connection->id = 104;
         $connection->expects(self::once())->method('send')->willReturnCallback(static function (string $raw): void {
