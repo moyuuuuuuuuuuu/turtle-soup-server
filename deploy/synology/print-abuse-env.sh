@@ -1,16 +1,21 @@
 #!/bin/sh
 # Read-only configuration discovery for cloudflared -> gateway -> server.
-# Run in the deployed Compose directory. Does not edit env files or restart services.
+# With no URL, print limits only and preserve existing trusted-proxy settings.
+# With a URL, run in the deployed Compose directory to discover trusted proxies too.
+# Does not edit env files or restart services.
 set -eu
 PATH=/usr/local/bin:$PATH
 export PATH
 
 fail() { printf '%s\n' "$*" >&2; exit 1; }
 public_url=${1:-}
+[ "$#" -le 1 ] || fail 'Usage: sh print-abuse-env.sh [https://your-public-hostname]'
 case "$public_url" in
+    '') ;;
     https://*) ;;
-    *) fail 'Usage: sh print-abuse-env.sh https://your-public-hostname' ;;
+    *) fail 'Usage: sh print-abuse-env.sh [https://your-public-hostname]' ;;
 esac
+discover_proxies() {
 command -v docker >/dev/null 2>&1 || fail 'docker must be available on PATH.'
 command -v curl >/dev/null 2>&1 || fail 'curl must be available on PATH.'
 [ -f production.env ] && [ -f compose.yaml ] || fail 'Run in the deployed directory containing production.env and compose.yaml.'
@@ -50,16 +55,30 @@ trusted="$gateway_ip/32"
 [ "$peer_ip" = "$gateway_ip" ] || trusted="$trusted,$peer_ip/32"
 printf '%s\n' "# Measured gateway: $gateway_ip; measured upstream peer: $peer_ip" >&2
 printf '%s\n' '# Valid for a Tunnel connecting directly to gateway. Additional reverse proxies require their addresses too.' >&2
+}
+
+if [ -n "$public_url" ]; then
+    discover_proxies
+    printf '%s\n' 'API_RATE_LIMIT_ENABLED=true' "TRUSTED_PROXY_CIDRS=$trusted"
+else
+    printf '%s\n' '# Limits only: keep existing API_RATE_LIMIT_ENABLED and TRUSTED_PROXY_CIDRS settings.' >&2
+fi
 cat <<EOF
-API_RATE_LIMIT_ENABLED=true
-TRUSTED_PROXY_CIDRS=$trusted
-GAME_GUEST_CALLS_PER_MINUTE=10
-GAME_GUEST_CALLS_PER_DAY=120
-GAME_USER_CALLS_PER_MINUTE=20
-GAME_USER_CALLS_PER_DAY=300
-GAME_IP_CALLS_PER_MINUTE=60
-GAME_IP_CALLS_PER_DAY=1000
-GAME_GLOBAL_CALLS_PER_DAY=10000
-GAME_IP_CONCURRENCY=4
+# Starting profile for about 1,000 daily active players.
+# One question or guess reserves 2 units, including one possible retry.
+COZE_RETRY_TIMES=1
+# Guest: 10 actions/minute, 150 actions/day.
+GAME_GUEST_CALLS_PER_MINUTE=20
+GAME_GUEST_CALLS_PER_DAY=300
+# Registered player: 20 actions/minute, 500 actions/day.
+GAME_USER_CALLS_PER_MINUTE=40
+GAME_USER_CALLS_PER_DAY=1000
+# Shared IP: 120 actions/minute; daily cap matches the global cap.
+GAME_IP_CALLS_PER_MINUTE=240
+GAME_IP_CALLS_PER_DAY=200000
+# Global: 100,000 actions/day. Zero does not disable these limits.
+GAME_GLOBAL_CALLS_PER_DAY=200000
+# Concurrent operations are not multiplied by retry attempts.
+GAME_IP_CONCURRENCY=10
 GAME_GLOBAL_CONCURRENCY=20
 EOF
